@@ -1,5 +1,7 @@
 import csv
 import os
+import re
+from typing import List
 
 import pandas as pd
 from transformers import pipeline
@@ -14,18 +16,42 @@ class Annotator:
             'text_parsing_methods_using_nlp',
             'data',
             'NBS_sentence.csv'
-        )
+        ),
+        dataset_size: int = 500
     ) -> None:
         # TODO - Docstring
+
         self._data = pd.read_csv(
-            input_data_filepath, delimiter=',', encoding='utf-8')
+            input_data_filepath, delimiter=',', encoding='utf-8'
+        )[:dataset_size]
+
         self._ner_pipeline = pipeline(
             task='ner',
             model='crabz/slovakbert-ner'
         )
+
         self._output_path = (
             f"{input_data_filepath.split('.')[0]}_annotated.csv"
         )
+
+        self._dataset_size = dataset_size
+
+        self._ner_labels = {
+            0: '0',
+            1: 'B-Person',
+            2: 'I-Person',
+            3: 'B-Organization',
+            4: 'I-Organization',
+            5: 'B-Location',
+            6: 'I-Location',
+            7: 'B-Date',
+            8: 'I-Date',
+            9: 'Time',
+            10: 'B-Money',
+            11: 'I-Money',
+            12: 'B-Percentage',
+            13: 'I-Percentage',
+        }
 
     def _preprocess_data(self) -> None:
         # TODO - Docstring
@@ -53,7 +79,7 @@ class Annotator:
             r'([+-]?[0-9]+),([0-9]+)': r'\1.\2',
 
             # Add extra space to floating point percentages
-            r'([+-]?[0-9]+.[0-9]+|[+-]?[0-9])(%)': r'\1 \2 ',
+            r'([+-]?[0-9]+\.[0-9]+|[+-]?[0-9])(%)': r'\1 \2 ',
 
             r',': r' ',
 
@@ -72,6 +98,8 @@ class Annotator:
 
             # r'atď .': 'atď.',
 
+            r'€': 'euro',
+
             r'(\s+[a-zA-Zľščťžýáíéóúäôňďĺ]) \.': r'\1.',
         }
 
@@ -85,6 +113,9 @@ class Annotator:
             lambda x: x.str.strip() if x.dtype == "object" else x
         )
 
+        for col in ['text', 'lemma_text']:
+            self._data[f'{col}_tokens'] = self._data[col].str.split(' ')
+
     def _save_data(self) -> None:
         # TODO - Docstring
         self._data.to_csv(
@@ -93,29 +124,62 @@ class Annotator:
             quoting=csv.QUOTE_NONNUMERIC
         )
 
+    def _fix_ner_tags(self, ner_tags: List[int], row: int, word_index: int):
+        # TODO - Docstring
+
+        new_ner_tags = []
+
+        text_tokens = self._data['text'][row].split()
+        lemma_text_tokens = self._data['lemma_text'][row].split()
+        
+        current_word = text_tokens[word_index]
+        current_word_lemma = lemma_text_tokens[word_index]
+
+        print(current_word)
+
+
+        next_word = next_word_lemma = ''
+
+        if word_index < len(text_tokens) - 1:
+            next_word = text_tokens[word_index + 1]
+            next_word_lemma = lemma_text_tokens[word_index + 1]
+
+        if current_word in ['NBS', 'NAKA'] and ner_tags[0] not in [3, 4]:
+            new_ner_tags.append(3)
+        elif re.compile(r'[0-9]{2}:[0-9]{2}').match(current_word):
+            new_ner_tags.append(9)
+        elif re.compile(r'[+-]?[0-9]+\.[0-9]+|[+-]?[0-9]').match(current_word):
+            if next_word == '%':
+                new_ner_tags.append(12)
+            elif next_word_lemma in ['mil', 'miliarda', 'milión']:
+                new_ner_tags.append(10)
+        elif current_word_lemma in ['%', 'percento']:
+            new_ner_tags.append(13)
+        else:
+            new_ner_tags = ner_tags
+
+        return new_ner_tags
+
     def annotate(self) -> None:
         # TODO - Docstring
 
         # TODO - Refactor
 
         self._preprocess_data()
-        self._save_data()
 
-        for i in range(500):
+        ner_tags_col = []
 
+        for i in range(self._dataset_size):
             classifications = self._ner_pipeline(self._data['text'][i])
 
-            tokens = self._data['lemma_text'][i].split()
-            text_tokens = self._data['text'][i].split()
-            # words = []
+            word_index = 0
             ner_tags = []
-            # current_words = []
             current_ner_tag = []
 
             for index, classification in enumerate(classifications):
-                # current_words.append(classification['word'].replace('Ġ', ''))
                 current_ner_tag.append(classification['entity'])
-                # current_words = [''.join(current_words)]
+
+                print(classification['word'])
 
                 if len(set(current_ner_tag)) == 1:
                     current_ner_tag = [current_ner_tag[0]]
@@ -128,20 +192,21 @@ class Annotator:
                 ):
                     continue
 
+                current_ner_tag = self._fix_ner_tags(
+                    ner_tags=current_ner_tag,
+                    row=i,
+                    word_index=word_index
+                )
+
                 ner_tags.extend(current_ner_tag) if len(
                     current_ner_tag) == 1 else ner_tags.append(current_ner_tag)
-                # words.extend(current_words)
 
-                # current_words = []
+                word_index += 1
+
                 current_ner_tag = []
 
-            # print(f'Our: {words}')
-            # print(f'Official Text: {text_tokens}')
-            # print(f'Official Lemma: {tokens}')
-            # print(ner_tags)
+            ner_tags_col.append(ner_tags)
 
-            # print(len(ner_tags))
-            # print(f'Same Length: {len(tokens) == len(ner_tags)}')
-            # print(f'Our: {len(words)}')
-            # print(f'Official Text: {len(text_tokens)}')
-            # print(f'Official Lemma: {len(tokens)}', end='\n\n')
+        self._data['ner_tags'] = ner_tags_col
+
+        self._save_data()
