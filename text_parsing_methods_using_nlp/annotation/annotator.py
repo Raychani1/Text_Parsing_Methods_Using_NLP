@@ -389,7 +389,7 @@ class Annotator:
                     )
                 ):
                     continue
-                    
+
                 # Save model prediction
                 ner_tags.extend(current_ner_tag)
 
@@ -426,11 +426,11 @@ class Annotator:
 
         self._save_data()
 
-    @staticmethod
     def display_confusion_matrix(
-            conf_matrix: np.ndarray,
-            labels: List[Any],
-            path: str
+        self,
+        conf_matrix: np.ndarray,
+        labels: List[Any],
+        path: str
     ) -> None:
         """Displays the passed Confusion Matrix.
         Args:
@@ -459,7 +459,7 @@ class Annotator:
 
         ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right")
 
-        plt.title('Confusion Matrix')
+        plt.title(f'SlovakBERT NER {self._dataset_size} Confusion Matrix')
         plt.xlabel('Predicted Label')
         plt.ylabel('Actual Label')
 
@@ -483,20 +483,21 @@ class Annotator:
         y_pred = pd.Series(
             list(itertools.chain(*self._data['ner_tags'].tolist()))
         )
-        
+
         # Evaluate Model Performance
-        print(classification_report(y_true, y_pred))        
+        print(classification_report(y_true, y_pred))
 
         # Generate Confusion Matrix
         self.display_confusion_matrix(
-            conf_matrix = confusion_matrix(y_true, y_pred),
-            labels = self._ner_labels_inverted.keys(),
-            path = os.path.join(
-                os.getcwd(), 
+            conf_matrix=confusion_matrix(y_true, y_pred),
+            labels=self._ner_labels_inverted.keys(),
+            path=os.path.join(
+                os.getcwd(),
                 'output',
-                'plots', 
+                'plots',
                 'confusion_matrices',
-                f'conf_matrix_{self._timestamp}.png'
+                f'slovakbert_ner_{self._dataset_size}_conf_matrix_'
+                f'{self._timestamp}.png'
             )
         )
 
