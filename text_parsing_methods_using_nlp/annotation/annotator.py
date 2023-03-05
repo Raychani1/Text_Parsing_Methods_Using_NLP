@@ -1,10 +1,15 @@
 import csv
+import itertools
 import os
 import re
 from datetime import datetime
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import seaborn as sns
+from sklearn.metrics import classification_report, confusion_matrix
 from transformers import pipeline
 
 
@@ -280,16 +285,12 @@ class Annotator:
         # Get the list of fixed_ner_tags
         fixed_ner_tags = row['fixed_ner_tags']
 
-        print(f'Before: {fixed_ner_tags}')
-
         # Overwrite the value at the specified list index
         fixed_ner_tags[token_index] = new_tag
 
-        print(f'After:  {fixed_ner_tags}')
-
         # Update the DataFrame with the new fixed_ner_tags value
         self._data[
-            self._data['id'] ==row_id
+            self._data['id'] == row_id
         ]['fixed_ner_tags'] = str(fixed_ner_tags)
 
     def _manual_correction(self) -> None:
@@ -306,7 +307,7 @@ class Annotator:
                     ]
                 )
 
-    def annotate(self) -> None:
+    def _annotate(self) -> None:
         # TODO - Docstring
 
         # TODO - Refactor
@@ -369,3 +370,75 @@ class Annotator:
         self._manual_correction()
 
         self._save_data()
+
+    @staticmethod
+    def display_confusion_matrix(
+            conf_matrix: np.ndarray,
+            labels: List[Any],
+            path: str
+    ) -> None:
+        """Display the passed in Confusion Matrix.
+        Args:
+            confusion_matrix (numpy.ndarray): Confusion Matrix to display
+            labels (List[Any]): Labels for Columns and Indexes
+            path (str):
+        """
+
+        # SOURCE:
+        # https://stackoverflow.com/questions/35572000/how-can-i-plot-a-confusion-matrix
+
+        # Convert Confusion Matrix to DataFrame
+        conf_matrix = pd.DataFrame(
+            data=conf_matrix,
+            index=labels,
+            columns=labels
+        )
+
+        # Create new Figure
+        figure = plt.figure(figsize=(16, 9))
+
+        # Add simple axes to plot on
+        ax = figure.add_subplot(1, 1, 1)
+
+        # Plot the Confusion Matrix
+        sns.heatmap(conf_matrix, annot=True, fmt='g', ax=ax)
+
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right")
+
+        plt.title('Confusion Matrix')
+        plt.xlabel('Predicted Label')
+        plt.ylabel('Actual Label')
+
+        plt.draw()
+        plt.savefig(f"{path}.png")
+        plt.show(block=False)
+
+    def _evaluate(self) -> None:
+        # TODO - Docstring   
+
+        self._data = pd.read_csv(self._output_path)
+
+        self._data['ner_tags'] = self._data['ner_tags'].apply(eval)
+        self._data['fixed_ner_tags'] = self._data['fixed_ner_tags'].apply(eval)
+
+        y_true = pd.Series(
+            list(itertools.chain(*self._data['fixed_ner_tags'].tolist()))
+        )
+        y_pred = pd.Series(
+            list(itertools.chain(*self._data['ner_tags'].tolist()))
+        )
+
+        print(classification_report(y_true, y_pred))        
+
+        self.display_confusion_matrix(
+            conf_matrix = confusion_matrix(y_true, y_pred),
+            labels = self._ner_labels_inverted.keys(),
+            path = os.path.join(os.getcwd(), 'conf_matrix')
+        )
+
+
+    def __call__(self) -> None:
+        # TODO - Docstring
+
+        self._annotate()
+        self._evaluate()

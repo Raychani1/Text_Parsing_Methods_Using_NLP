@@ -9,4 +9,4 @@ if __name__ == '__main__':
         manual_correction_filepath=os.path.join(os.getcwd(), 'manual.txt')
     )
 
-    annotator.annotate()
+    annotator()
