@@ -1,7 +1,7 @@
 import csv
 import os
 import re
-from typing import List
+from typing import List, Tuple
 
 import pandas as pd
 from transformers import pipeline
@@ -53,6 +53,27 @@ class Annotator:
             13: 'I-Percentage',
         }
 
+        self._month_lemmas = [
+            'január',
+            'február',
+            'marec',
+            'apríl',
+            'máj',
+            'jún',
+            'júl',
+            'august',
+            'september',
+            'október',
+            'november',
+            'december'
+        ]
+
+        self._year_prefix_lemmas = ['', 'štvrťrok', 'polrok', 'rok']
+
+        self._money_lemmas = ['tisíc', 'mil', 'milión', 'miliarda', 'euro']
+
+        self._percentage_lemmas = ['%', 'percento', 'p.b.']
+
     def _preprocess_data(self) -> None:
         # TODO - Docstring
 
@@ -61,7 +82,7 @@ class Annotator:
             # Add an extra space before colon which is not a time indicator
             r'([a-zA-Z]+):([a-zA-Z]+)': r'\1 : \2',
 
-            r'(\[\s*[0-9]+\s*\])': r' ',
+            r'(\[\s*\d+\s*\])': r' ',
 
             # Remove special characters
             r'''['"`‘’„“”\(\)\[\]\/(\s\-|–\s))!?;]|(\s*:\s+)|(\.|,)\s*(\.|,)''': r' ',
@@ -73,34 +94,31 @@ class Annotator:
             r'([ľščťžýáíéóúäôňďĺ%]{1,}[a-zA-Z0-9]*)\s*(\.)\s*': r'\1 ',
 
             # Remove dots from text
-            r'([0-9]{1,})(\s*\.\s*)': r'\1 ',
+            r'(\d{1,})(\s*\.\s*)': r'\1 ',
 
             # Replace floating point number commas with dot notation
-            r'([+-]?[0-9]+),([0-9]+)': r'\1.\2',
+            r'([+-]?\d+),(\d+)': r'\1.\2',
 
             # Add extra space to floating point percentages
-            r'([+-]?[0-9]+\.[0-9]+|[+-]?[0-9])(%)': r'\1 \2 ',
+            r'([+-]?\d+\.\d+|[+-]?\d)(%)': r'\1 \2 ',
 
             r',': r' ',
-
-            # # Remove dots from text
-            # r'([a-zA-Z]{2,})(\.\s*)([a-zA-Z]*)': r'\1 \3',
 
             # Replace excessive whitespace characters
             r'\s+': r' ',
 
             # Merge larger number formats together
-            r'( [+-]?[0-9]{1,3}) ([0-9]+) ([a-z]*)': r'\1\2 \3',
+            r'( [+-]?\d{1,3}) (\d+) ([a-z]*)': r'\1\2 \3',
 
-            # r'j\.\s*s\.\s*a': 'j.s.a',
-
-            # r'a\.\s*s\.': 'a.s.',
-
-            # r'atď .': 'atď.',
-
+            # Replace Euro symbol
             r'€': 'euro',
 
+            # Remove extra space after letters
             r'(\s+[a-zA-Zľščťžýáíéóúäôňďĺ]) \.': r'\1.',
+
+            r'p\. b\.': 'p.b.',
+
+            r'desaťtisíc': '10 tisíc'
         }
 
         for to_replace, replacement in regex_mapping.items():
@@ -124,37 +142,118 @@ class Annotator:
             quoting=csv.QUOTE_NONNUMERIC
         )
 
+    def _select_tokens(
+        self,
+        row: int,
+        word_index: int
+    ) -> Tuple[str, str, str, str]:
+        # TODO - Docstring
+        next_word_lemma = previous_word_lemma = ''
+
+        text_tokens = self._data['text'][row].split()
+        lemma_text_tokens = self._data['lemma_text'][row].split()
+
+        # Get Previous Word and Lemma
+        if word_index > 1:
+            previous_word_lemma = lemma_text_tokens[word_index - 1]
+
+        # Get Current Word and Lemma
+        current_word = text_tokens[word_index]
+        current_word_lemma = lemma_text_tokens[word_index]
+
+        # Get Next Word and Lemma
+        if word_index < len(text_tokens) - 1:
+            next_word_lemma = lemma_text_tokens[word_index + 1]
+
+        return (
+            previous_word_lemma,
+            current_word,
+            current_word_lemma,
+            next_word_lemma
+        )
+
+    def _process_numbers(
+        self,
+        ner_tags: List[int],
+        previous_word_lemma: str,
+        next_word_lemma: str
+    ) -> int:
+        # TODO - Docstring
+        new_ner_tag = 0
+
+        if (
+            next_word_lemma in self._month_lemmas or
+            previous_word_lemma in self._year_prefix_lemmas
+        ):
+            new_ner_tag = 7
+        elif previous_word_lemma in self._month_lemmas or ner_tags[-1] == 7:
+            new_ner_tag = 8
+        elif next_word_lemma in self._money_lemmas:
+            new_ner_tag = 10
+        elif next_word_lemma in self._percentage_lemmas:
+            new_ner_tag = 12
+
+        return new_ner_tag
+
     def _fix_ner_tags(self, ner_tags: List[int], row: int, word_index: int):
         # TODO - Docstring
 
         new_ner_tags = []
 
-        text_tokens = self._data['text'][row].split()
-        lemma_text_tokens = self._data['lemma_text'][row].split()
-        
-        current_word = text_tokens[word_index]
-        current_word_lemma = lemma_text_tokens[word_index]
+        previous_word_lemma, current_word, current_word_lemma, next_word_lemma = self._select_tokens(
+            row, word_index
+        )
 
-        print(current_word)
-
-
-        next_word = next_word_lemma = ''
-
-        if word_index < len(text_tokens) - 1:
-            next_word = text_tokens[word_index + 1]
-            next_word_lemma = lemma_text_tokens[word_index + 1]
-
+        # Fix common miss-matches
         if current_word in ['NBS', 'NAKA'] and ner_tags[0] not in [3, 4]:
             new_ner_tags.append(3)
-        elif re.compile(r'[0-9]{2}:[0-9]{2}').match(current_word):
+
+        # Process Time
+        elif re.compile(r'\d{2}:\d{2}').match(current_word):
             new_ner_tags.append(9)
-        elif re.compile(r'[+-]?[0-9]+\.[0-9]+|[+-]?[0-9]').match(current_word):
-            if next_word == '%':
-                new_ner_tags.append(12)
-            elif next_word_lemma in ['mil', 'miliarda', 'milión']:
+
+        # Process Number
+        elif re.compile(r'[+-]?\d+\.\d+|[+-]?\d').match(current_word):
+            # Old Version
+            if (
+                next_word_lemma in self._month_lemmas or 
+                previous_word_lemma in self._year_prefix_lemmas
+            ):
+                new_ner_tags.append(7)
+            elif previous_word_lemma in self._month_lemmas or ner_tags[-1] == 7:
+                new_ner_tags.append(8)
+            elif next_word_lemma in self._money_lemmas:
                 new_ner_tags.append(10)
-        elif current_word_lemma in ['%', 'percento']:
+            elif next_word_lemma in self._percentage_lemmas:
+                new_ner_tags.append(12)
+            # else:
+            #     new_ner_tags.append(0)
+
+            # # Refactored Version
+            # new_ner_tags.append(
+            #     self._process_numbers(
+            #         ner_tags,
+            #         previous_word_lemma,
+            #         next_word_lemma
+            #     )
+            # )
+
+        # Process Date
+        elif current_word_lemma in self._month_lemmas:
+            if ner_tags[-1] == 7:
+                new_ner_tags.append(8)
+            else:
+                new_ner_tags.append(7)
+
+        # Process Money
+        elif current_word_lemma in self._money_lemmas:
+            new_ner_tags.append(11)
+
+        # Process Percentage
+        elif current_word_lemma in self._percentage_lemmas:
             new_ner_tags.append(13)
+
+        # No fix is needed
         else:
             new_ner_tags = ner_tags
 
@@ -168,21 +267,25 @@ class Annotator:
         self._preprocess_data()
 
         ner_tags_col = []
+        fixed_ner_tags_col = []
 
         for i in range(self._dataset_size):
             classifications = self._ner_pipeline(self._data['text'][i])
 
             word_index = 0
             ner_tags = []
+            fixed_ner_tags = []
             current_ner_tag = []
 
             for index, classification in enumerate(classifications):
                 current_ner_tag.append(classification['entity'])
 
-                print(classification['word'])
+                # print(classification['word'])
 
                 if len(set(current_ner_tag)) == 1:
                     current_ner_tag = [current_ner_tag[0]]
+
+                # current_ner_tag = [current_ner_tag[0]]
 
                 if (
                     index < len(classifications) - 1 and
@@ -192,21 +295,26 @@ class Annotator:
                 ):
                     continue
 
+                ner_tags.extend(current_ner_tag) if len(
+                    current_ner_tag) == 1 else ner_tags.append(current_ner_tag)
+
                 current_ner_tag = self._fix_ner_tags(
                     ner_tags=current_ner_tag,
                     row=i,
                     word_index=word_index
                 )
 
-                ner_tags.extend(current_ner_tag) if len(
-                    current_ner_tag) == 1 else ner_tags.append(current_ner_tag)
+                fixed_ner_tags.extend(current_ner_tag) if len(
+                    current_ner_tag) == 1 else fixed_ner_tags.append(current_ner_tag)
 
                 word_index += 1
 
                 current_ner_tag = []
 
             ner_tags_col.append(ner_tags)
+            fixed_ner_tags_col.append(fixed_ner_tags)
 
         self._data['ner_tags'] = ner_tags_col
+        self._data['fixed_ner_tags'] = fixed_ner_tags_col
 
         self._save_data()
