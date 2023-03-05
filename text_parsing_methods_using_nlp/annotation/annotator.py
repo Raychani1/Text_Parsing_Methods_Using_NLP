@@ -1,6 +1,7 @@
 import csv
 import os
 import re
+from datetime import datetime
 from typing import List, Tuple
 
 import pandas as pd
@@ -11,6 +12,7 @@ class Annotator:
 
     def __init__(
         self,
+        manual_correction_filepath: str,
         input_data_filepath: str = os.path.join(
             os.getcwd(),
             'text_parsing_methods_using_nlp',
@@ -25,13 +27,16 @@ class Annotator:
             input_data_filepath, delimiter=',', encoding='utf-8'
         )[:dataset_size]
 
+        self._manual_correction_filepath = manual_correction_filepath
+
+        self._output_path = (
+            f"{input_data_filepath.split('.')[0]}_annotated_"
+            f"{datetime.now().strftime('%d_%m_%Y__%H_%M_%S')}.csv"
+        )
+
         self._ner_pipeline = pipeline(
             task='ner',
             model='crabz/slovakbert-ner'
-        )
-
-        self._output_path = (
-            f"{input_data_filepath.split('.')[0]}_annotated.csv"
         )
 
         self._dataset_size = dataset_size
@@ -52,6 +57,8 @@ class Annotator:
             12: 'B-Percentage',
             13: 'I-Percentage',
         }
+
+        self._ner_labels_inverted = {v: k for k, v in self._ner_labels.items()}
 
         self._month_lemmas = [
             'január',
@@ -214,29 +221,29 @@ class Annotator:
 
         # Process Number
         elif re.compile(r'[+-]?\d+\.\d+|[+-]?\d').match(current_word):
-            # Old Version
-            if (
-                next_word_lemma in self._month_lemmas or 
-                previous_word_lemma in self._year_prefix_lemmas
-            ):
-                new_ner_tags.append(7)
-            elif previous_word_lemma in self._month_lemmas or ner_tags[-1] == 7:
-                new_ner_tags.append(8)
-            elif next_word_lemma in self._money_lemmas:
-                new_ner_tags.append(10)
-            elif next_word_lemma in self._percentage_lemmas:
-                new_ner_tags.append(12)
+            # # Old Version
+            # if (
+            #     next_word_lemma in self._month_lemmas or
+            #     previous_word_lemma in self._year_prefix_lemmas
+            # ):
+            #     new_ner_tags.append(7)
+            # elif previous_word_lemma in self._month_lemmas or ner_tags[-1] == 7:
+            #     new_ner_tags.append(8)
+            # elif next_word_lemma in self._money_lemmas:
+            #     new_ner_tags.append(10)
+            # elif next_word_lemma in self._percentage_lemmas:
+            #     new_ner_tags.append(12)
             # else:
             #     new_ner_tags.append(0)
 
-            # # Refactored Version
-            # new_ner_tags.append(
-            #     self._process_numbers(
-            #         ner_tags,
-            #         previous_word_lemma,
-            #         next_word_lemma
-            #     )
-            # )
+            # Refactored Version
+            new_ner_tags.append(
+                self._process_numbers(
+                    ner_tags,
+                    previous_word_lemma,
+                    next_word_lemma
+                )
+            )
 
         # Process Date
         elif current_word_lemma in self._month_lemmas:
@@ -259,6 +266,46 @@ class Annotator:
 
         return new_ner_tags
 
+    def _replace_ner_tag(
+        self,
+        row_id: int,
+        token_index: int,
+        new_tag: int
+    ) -> None:
+        # TODO - Docstring
+
+        # Get the row with the specified ID
+        row = self._data[self._data['id'] == row_id].iloc[0]
+
+        # Get the list of fixed_ner_tags
+        fixed_ner_tags = row['fixed_ner_tags']
+
+        print(f'Before: {fixed_ner_tags}')
+
+        # Overwrite the value at the specified list index
+        fixed_ner_tags[token_index] = new_tag
+
+        print(f'After:  {fixed_ner_tags}')
+
+        # Update the DataFrame with the new fixed_ner_tags value
+        self._data[
+            self._data['id'] ==row_id
+        ]['fixed_ner_tags'] = str(fixed_ner_tags)
+
+    def _manual_correction(self) -> None:
+        # TODO - Docstring
+        with open(self._manual_correction_filepath, 'r') as f:
+            for section in [
+                s.strip().split('\n') for s in f.read().split('\n\n')
+            ]:
+                self._replace_ner_tag(
+                    row_id=int(section[0].split()[-1]),
+                    token_index=int(section[1].split()[-1]),
+                    new_tag=self._ner_labels_inverted[
+                        section[-1].split('--')[-1].strip()
+                    ]
+                )
+
     def annotate(self) -> None:
         # TODO - Docstring
 
@@ -280,12 +327,7 @@ class Annotator:
             for index, classification in enumerate(classifications):
                 current_ner_tag.append(classification['entity'])
 
-                # print(classification['word'])
-
-                if len(set(current_ner_tag)) == 1:
-                    current_ner_tag = [current_ner_tag[0]]
-
-                # current_ner_tag = [current_ner_tag[0]]
+                current_ner_tag = [current_ner_tag[0]]
 
                 if (
                     index < len(classifications) - 1 and
@@ -295,8 +337,7 @@ class Annotator:
                 ):
                     continue
 
-                ner_tags.extend(current_ner_tag) if len(
-                    current_ner_tag) == 1 else ner_tags.append(current_ner_tag)
+                ner_tags.extend(current_ner_tag)
 
                 current_ner_tag = self._fix_ner_tags(
                     ner_tags=current_ner_tag,
@@ -304,8 +345,16 @@ class Annotator:
                     word_index=word_index
                 )
 
-                fixed_ner_tags.extend(current_ner_tag) if len(
-                    current_ner_tag) == 1 else fixed_ner_tags.append(current_ner_tag)
+                fixed_ner_tags.extend(current_ner_tag)
+
+                # # For Manual Annotation purposes
+                # print(f"ID: {self._data['id'][i]}")
+                # print(f"Token Index: {word_index}")
+                # print(f"Word: {self._data['text_tokens'][i][word_index]}")
+                # print(
+                #     f"NER Tag: {self._ner_labels[current_ner_tag[0]]}",
+                #     end='\n\n'
+                # )
 
                 word_index += 1
 
@@ -316,5 +365,7 @@ class Annotator:
 
         self._data['ner_tags'] = ner_tags_col
         self._data['fixed_ner_tags'] = fixed_ner_tags_col
+
+        self._manual_correction()
 
         self._save_data()
