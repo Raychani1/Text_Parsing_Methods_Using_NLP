@@ -26,7 +26,7 @@ class Annotator:
             'data',
             'NBS_sentence.csv'
         ),
-        dataset_size: int = 100
+        dataset_size: int = 8445
     ) -> None:
         """Initializes the Annotator Class.
 
@@ -104,10 +104,16 @@ class Annotator:
             r'([a-zA-Z]+):([a-zA-Z]+)': r'\1 : \2',
 
             # Remove reference indicators
-            r'(\[\s*\d+\s*\])': r' ',
+            r'(\[\s*\d+\s*\])': ' ',
+
+            # Split ranges
+            r'(\d)-(\d)': r'\1 až \2',
 
             # Remove special characters
-            r'''['"`‘’„“”\(\)\[\]\/(\s\-|–\s))!?;]|(\s*:\s+)|(\.|,)\s*(\.|,)''': r' ',
+            r'''['"`‘’„“”\(\)\[\]\/(\s\-|–\s))!?;…\|]|(\.|,)\s*(\.|,)''': ' ',
+
+            # Remove redundant colons
+            r'(\s*:\s+)': ' ',
 
             # Remove dots from text
             r'([a-zA-Z]{2,})(\s*\.\s*)': r'\1 ',
@@ -125,25 +131,43 @@ class Annotator:
             r'([+-]?\d+\.\d+|[+-]?\d)(%)': r'\1 \2 ',
 
             # Remove commas from text
-            r',': r' ',
+            ',': ' ',
 
             # Replace excessive whitespace characters
-            r'\s+': r' ',
+            r'\s+': ' ',
 
             # Merge larger number formats together
             r'( [+-]?\d{1,3}) (\d+) ([a-z]*)': r'\1\2 \3',
 
             # Replace Euro symbol
-            r'€': 'euro',
+            '€': 'euro',
 
             # Remove extra space after letters
             r'(\s+[a-zA-Zľščťžýáíéóúäôňďĺ]) \.': r'\1.',
 
             # Replace specific percentage value
-            r'p\. b\.': 'p.b.',
+            r'p\s*\.\s*b\s*\.': 'p.b.',
+
+            # Fix punctuation
+            r'(d|D)\.(c|C)\s*\.': r'\1.\2.',
+
+            # Fix punctuation
+            r'o.c.p\s*\.': 'o.c.p.',
+
+            # Split email user and provider
+            r'([a-z])@([a-z]*)\s+': r'\1 @ \2 ',
+
+            # Fix company names
+            r'([a-zA-z])\s*&\s*([a-zA-z])': r'\1&\2',
 
             # Replace specific monetary value
-            r'desaťtisíc': '10 tisíc'
+            'desaťtisíc': '10 tisíc',
+
+            # Fix preprocessing result(s)
+            'Česko Slovensk': 'Československ',
+            'makro ekonomick': 'makroekonomick',
+            'e mail': 'email',
+
         }
 
         # Apply regex replacements to dataset
