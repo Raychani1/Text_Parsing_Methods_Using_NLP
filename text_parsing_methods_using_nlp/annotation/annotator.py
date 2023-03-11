@@ -3,14 +3,31 @@ import itertools
 import os
 import re
 from datetime import datetime
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import seaborn as sns
 from sklearn.metrics import classification_report, confusion_matrix
 from transformers import pipeline
+
+from text_parsing_methods_using_nlp.config import (
+    ANNOTATED_DATA_FOLDER,
+    ANNOTATION_PROCESS_OUTPUT_FOLDER,
+    CLASSIFICATION_REPORTS_OUTPUT_FOLDER,
+    CONFUSION_MATRICES_OUTPUT_FOLDER,
+    DATA_CONFIG,
+    INVERTED_NER_LABELS,
+    MANUAL_CORRECTION_DATA_FOLDER,
+    MONEY_LEMMAS,
+    MONTH_LEMMAS,
+    NER_LABELS,
+    PERCENTAGE_LEMMAS,
+    PREPROCESSING_REGEX_RULES,
+    YEAR_PREFIX_LEMMAS,
+)
+from text_parsing_methods_using_nlp.ops.plotter import Plotter
+
+# Set data config
+config = DATA_CONFIG['NBS_sentence']
 
 
 class Annotator:
@@ -19,159 +36,69 @@ class Annotator:
 
     def __init__(
         self,
-        manual_correction_filepath: str,
-        input_data_filepath: str = os.path.join(
-            os.getcwd(),
-            'text_parsing_methods_using_nlp',
-            'data',
-            'NBS_sentence.csv'
-        ),
-        dataset_size: int = 8445
+        manual_correction_filepath: str = None,
+        input_data_filepath: str = config['raw_input_data_path'],
+        dataset_size: int = config['dataset_size']
     ) -> None:
         """Initializes the Annotator Class.
 
         Args:
-            manual_correction_filepath (str): Manual Correction File Path.
+            manual_correction_filepath (str, optional): Manual Correction File
+            Path. Defaults to None.
             input_data_filepath (str, optional): Input Data File Path. Defaults
-            to 'Project_root...NBS_sentence.csv'.
+            to 'NBS_sentence.csv'.
             dataset_size (int, optional): Size of dataset to process. Defaults
-            to 100.
+            to NBS_sentence length - 8445.
         """
         self._timestamp = datetime.now().strftime('%d_%m_%Y__%H_%M_%S')
-        self._data = pd.read_csv(
-            input_data_filepath, delimiter=',', encoding='utf-8'
-        )[:dataset_size]
-
-        self._manual_correction_filepath = manual_correction_filepath
-
-        self._output_path = (
-            f"{input_data_filepath.split('.')[0]}_annotated_"
-            f"{self._timestamp}.csv"
-        )
-
-        self._ner_pipeline = pipeline(
-            task='ner',
-            model='crabz/slovakbert-ner'
-        )
 
         self._dataset_size = dataset_size
 
-        self._ner_labels = {
-            0: '0',
-            1: 'B-Person',
-            2: 'I-Person',
-            3: 'B-Organization',
-            4: 'I-Organization',
-            5: 'B-Location',
-            6: 'I-Location',
-            7: 'B-Date',
-            8: 'I-Date',
-            9: 'Time',
-            10: 'B-Money',
-            11: 'I-Money',
-            12: 'B-Percentage',
-            13: 'I-Percentage',
-        }
+        self._data = pd.read_csv(
+            input_data_filepath, delimiter=',', encoding='utf-8'
+        )[:self._dataset_size]
 
-        self._ner_labels_inverted = {v: k for k, v in self._ner_labels.items()}
+        self._output_file_prefix = (
+            f"{config['file_name']}_{self._dataset_size}"
+        )
 
-        self._month_lemmas = [
-            'január',
-            'február',
-            'marec',
-            'apríl',
-            'máj',
-            'jún',
-            'júl',
-            'august',
-            'september',
-            'október',
-            'november',
-            'december'
-        ]
+        self._manual_correction_filepath = (
+            os.path.join(
+                MANUAL_CORRECTION_DATA_FOLDER,
+                f"{self._output_file_prefix}_Manual.txt"
+            ) if manual_correction_filepath is None
+            else manual_correction_filepath
+        )
 
-        self._year_prefix_lemmas = ['', 'štvrťrok', 'polrok', 'rok']
+        self._manual_correction_file_exists = os.path.exists(
+            self._manual_correction_filepath
+        )
 
-        self._money_lemmas = ['tisíc', 'mil', 'milión', 'miliarda', 'euro']
+        self._annotation_process_output_path = (
+            None if self._manual_correction_file_exists else os.path.join(
+                ANNOTATION_PROCESS_OUTPUT_FOLDER,
+                f"{self._output_file_prefix}_Process_{self._timestamp}.txt"
+            )
+        )
 
-        self._percentage_lemmas = ['%', 'percento', 'p.b.']
+        self._classification_report_output_path = os.path.join(
+            CLASSIFICATION_REPORTS_OUTPUT_FOLDER,
+            f"{self._output_file_prefix}_class_report_{self._timestamp}.txt"
+        )
+        
+        self._output_path = os.path.join(
+            ANNOTATED_DATA_FOLDER,
+            f"{self._output_file_prefix}_Annotated_{self._timestamp}.csv"
+        )
+
+        self._ner_pipeline = pipeline(task='ner', model='crabz/slovakbert-ner')
+
+        self._plotter = Plotter()
 
     def _preprocess_data(self) -> None:
         """Pre-processes dataset."""
-        regex_mapping = {
-
-            # Add an extra space before colon which is not a time indicator
-            r'([a-zA-Z]+):([a-zA-Z]+)': r'\1 : \2',
-
-            # Remove reference indicators
-            r'(\[\s*\d+\s*\])': ' ',
-
-            # Split ranges
-            r'(\d)-(\d)': r'\1 až \2',
-
-            # Remove special characters
-            r'''['"`‘’„“”\(\)\[\]\/(\s\-|–\s))!?;…\|]|(\.|,)\s*(\.|,)''': ' ',
-
-            # Remove redundant colons
-            r'(\s*:\s+)': ' ',
-
-            # Remove dots from text
-            r'([a-zA-Z]{2,})(\s*\.\s*)': r'\1 ',
-
-            # Remove dots from text
-            r'([ľščťžýáíéóúäôňďĺ%]{1,}[a-zA-Z0-9]*)\s*(\.)\s*': r'\1 ',
-
-            # Remove dots from text
-            r'(\d{1,})(\s*\.\s*)': r'\1 ',
-
-            # Replace floating point number commas with dot notation
-            r'([+-]?\d+),(\d+)': r'\1.\2',
-
-            # Add extra space to floating point percentages
-            r'([+-]?\d+\.\d+|[+-]?\d)(%)': r'\1 \2 ',
-
-            # Remove commas from text
-            ',': ' ',
-
-            # Replace excessive whitespace characters
-            r'\s+': ' ',
-
-            # Merge larger number formats together
-            r'( [+-]?\d{1,3}) (\d+) ([a-z]*)': r'\1\2 \3',
-
-            # Replace Euro symbol
-            '€': 'euro',
-
-            # Remove extra space after letters
-            r'(\s+[a-zA-Zľščťžýáíéóúäôňďĺ]) \.': r'\1.',
-
-            # Replace specific percentage value
-            r'p\s*\.\s*b\s*\.': 'p.b.',
-
-            # Fix punctuation
-            r'(d|D)\.(c|C)\s*\.': r'\1.\2.',
-
-            # Fix punctuation
-            r'o.c.p\s*\.': 'o.c.p.',
-
-            # Split email user and provider
-            r'([a-z])@([a-z]*)\s+': r'\1 @ \2 ',
-
-            # Fix company names
-            r'([a-zA-z])\s*&\s*([a-zA-z])': r'\1&\2',
-
-            # Replace specific monetary value
-            'desaťtisíc': '10 tisíc',
-
-            # Fix preprocessing result(s)
-            'Česko Slovensk': 'Československ',
-            'makro ekonomick': 'makroekonomick',
-            'e mail': 'email',
-
-        }
-
         # Apply regex replacements to dataset
-        for to_replace, replacement in regex_mapping.items():
+        for to_replace, replacement in PREPROCESSING_REGEX_RULES.items():
             self._data.replace(
                 to_replace, replacement, regex=True, inplace=True
             )
@@ -184,6 +111,32 @@ class Annotator:
         # Tokenize text and lemmas
         for col in ['text', 'lemma_text']:
             self._data[f'{col}_tokens'] = self._data[col].str.split(' ')
+    
+    def _document_annotation_process(
+        self,
+        row_index: int,
+        word_index: int,
+        current_ner_tag: List[int]
+    ) -> None:
+        """Documents annotation process.
+        
+            This will allows us to create a manual correction file.
+
+        Args:
+            row_index (int): Current processed row index.
+            word_index (int): Current processed word index.
+            current_ner_tag (List[int]): Current word NER Tag.
+        """
+        process_messages = [
+            f"ID: {self._data['id'][row_index]}\n",
+            f'Token Index: {word_index}\n',
+            f"Word: {self._data['text_tokens'][row_index][word_index]}\n",
+            f'NER Tag: {NER_LABELS[current_ner_tag[0]]} -- \n\n'
+        ]
+
+        with open(self._annotation_process_output_path, 'a+') as process_file:
+            for process_message in process_messages:
+                process_file.write(process_message)
 
     def _save_data(self) -> None:
         """Saves annotated dataset."""
@@ -193,7 +146,9 @@ class Annotator:
             quoting=csv.QUOTE_NONNUMERIC
         )
 
-    # Automatic NER Tag Correction
+    ###########################################################################
+    #                      Automatic NER Tag Correction                       #
+    ###########################################################################
 
     def _select_tokens(
         self,
@@ -253,15 +208,15 @@ class Annotator:
         new_ner_tag = 0
 
         if (
-            next_word_lemma in self._month_lemmas or
-            previous_word_lemma in self._year_prefix_lemmas
+            next_word_lemma in MONTH_LEMMAS or
+            previous_word_lemma in YEAR_PREFIX_LEMMAS
         ):
             new_ner_tag = 7
-        elif previous_word_lemma in self._month_lemmas or ner_tags[-1] == 7:
+        elif previous_word_lemma in MONTH_LEMMAS or ner_tags[-1] == 7:
             new_ner_tag = 8
-        elif next_word_lemma in self._money_lemmas:
+        elif next_word_lemma in MONEY_LEMMAS:
             new_ner_tag = 10
-        elif next_word_lemma in self._percentage_lemmas:
+        elif next_word_lemma in PERCENTAGE_LEMMAS:
             new_ner_tag = 12
 
         return new_ner_tag
@@ -284,9 +239,13 @@ class Annotator:
         """
         new_ner_tags = []
 
-        previous_word_lemma, current_word, current_word_lemma, next_word_lemma = self._select_tokens(
-            row, word_index
-        )
+        # Select Tokens
+        (
+            previous_word_lemma, 
+            current_word, 
+            current_word_lemma, 
+            next_word_lemma
+        ) = self._select_tokens(row, word_index)
 
         # Fix common miss-matches
         if current_word in ['NBS', 'NAKA'] and ner_tags[0] not in [3, 4]:
@@ -300,15 +259,15 @@ class Annotator:
         elif re.compile(r'[+-]?\d+\.\d+|[+-]?\d').match(current_word):
             # # Old Version
             # if (
-            #     next_word_lemma in self._month_lemmas or
-            #     previous_word_lemma in self._year_prefix_lemmas
+            #     next_word_lemma in MONTH_LEMMAS or
+            #     previous_word_lemma in YEAR_PREFIX_LEMMAS
             # ):
             #     new_ner_tags.append(7)
-            # elif previous_word_lemma in self._month_lemmas or ner_tags[-1] == 7:
+            # elif previous_word_lemma in MONTH_LEMMAS or ner_tags[-1] == 7:
             #     new_ner_tags.append(8)
-            # elif next_word_lemma in self._money_lemmas:
+            # elif next_word_lemma in MONEY_LEMMAS:
             #     new_ner_tags.append(10)
-            # elif next_word_lemma in self._percentage_lemmas:
+            # elif next_word_lemma in PERCENTAGE_LEMMAS:
             #     new_ner_tags.append(12)
             # else:
             #     new_ner_tags.append(0)
@@ -323,18 +282,18 @@ class Annotator:
             )
 
         # Process Date
-        elif current_word_lemma in self._month_lemmas:
+        elif current_word_lemma in MONTH_LEMMAS:
             if previous_word_lemma.isdigit():
                 new_ner_tags.append(8)
             else:
                 new_ner_tags.append(7)
 
         # Process Money
-        elif current_word_lemma in self._money_lemmas:
+        elif current_word_lemma in MONEY_LEMMAS:
             new_ner_tags.append(11)
 
         # Process Percentage
-        elif current_word_lemma in self._percentage_lemmas:
+        elif current_word_lemma in PERCENTAGE_LEMMAS:
             new_ner_tags.append(13)
 
         # No fix is needed
@@ -343,7 +302,9 @@ class Annotator:
 
         return new_ner_tags
 
-    # Manual NER Tag Correction
+    ###########################################################################
+    #                        Manual NER Tag Correction                        #
+    ###########################################################################
 
     def _replace_ner_tag(
         self,
@@ -381,7 +342,7 @@ class Annotator:
                 self._replace_ner_tag(
                     row_id=int(section[0].split()[-1]),
                     token_index=int(section[1].split()[-1]),
-                    new_tag=self._ner_labels_inverted[
+                    new_tag=INVERTED_NER_LABELS[
                         section[-1].split('--')[-1].strip()
                     ]
                 )
@@ -427,14 +388,12 @@ class Annotator:
                 # Save corrected values
                 fixed_ner_tags.extend(current_ner_tag)
 
-                # # For Manual Annotation purposes
-                # print(f"ID: {self._data['id'][i]}")
-                # print(f"Token Index: {word_index}")
-                # print(f"Word: {self._data['text_tokens'][i][word_index]}")
-                # print(
-                #     f"NER Tag: {self._ner_labels[current_ner_tag[0]]}",
-                #     end='\n\n'
-                # )
+                if not self._manual_correction_file_exists:
+                    self._document_annotation_process(
+                        row_index=i,
+                        word_index=word_index,
+                        current_ner_tag=current_ner_tag
+                    )
 
                 word_index += 1
 
@@ -446,50 +405,10 @@ class Annotator:
         self._data['ner_tags'] = ner_tags_col
         self._data['fixed_ner_tags'] = fixed_ner_tags_col
 
-        self._manual_correction()
+        if self._manual_correction_file_exists:
+            self._manual_correction()
 
         self._save_data()
-
-    def display_confusion_matrix(
-        self,
-        conf_matrix: np.ndarray,
-        labels: List[Any],
-        path: str
-    ) -> None:
-        """Displays the passed Confusion Matrix.
-        Args:
-            confusion_matrix (numpy.ndarray): Confusion Matrix to display
-            labels (List[Any]): Labels for Columns and Indexes
-            path (str): Output save path.
-        """
-        # SOURCE:
-        # https://stackoverflow.com/questions/35572000/how-can-i-plot-a-confusion-matrix
-
-        # Convert Confusion Matrix to DataFrame
-        conf_matrix = pd.DataFrame(
-            data=conf_matrix,
-            index=labels,
-            columns=labels
-        )
-
-        # Create new Figure
-        figure = plt.figure(figsize=(16, 9))
-
-        # Add simple axes to plot on
-        ax = figure.add_subplot(1, 1, 1)
-
-        # Plot the Confusion Matrix
-        sns.heatmap(conf_matrix, annot=True, fmt='g', ax=ax)
-
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right")
-
-        plt.title(f'SlovakBERT NER {self._dataset_size} Confusion Matrix')
-        plt.xlabel('Predicted Label')
-        plt.ylabel('Actual Label')
-
-        plt.draw()
-        plt.savefig(path)
-        plt.show(block=False)
 
     def _evaluate(self) -> None:
         """Evaluates Model Performance based on predicted and corrected 
@@ -509,17 +428,16 @@ class Annotator:
         )
 
         # Evaluate Model Performance
-        print(classification_report(y_true, y_pred))
+        with open(self._classification_report_output_path, 'w+') as output:
+            output.write(classification_report(y_true, y_pred))
 
         # Generate Confusion Matrix
-        self.display_confusion_matrix(
+        self._plotter.display_confusion_matrix(
             conf_matrix=confusion_matrix(y_true, y_pred),
-            labels=self._ner_labels_inverted.keys(),
+            title=f'SlovakBERT NER {self._dataset_size} Confusion Matrix',
+            labels=INVERTED_NER_LABELS.keys(),
             path=os.path.join(
-                os.getcwd(),
-                'output',
-                'plots',
-                'confusion_matrices',
+                CONFUSION_MATRICES_OUTPUT_FOLDER,
                 f'slovakbert_ner_{self._dataset_size}_conf_matrix_'
                 f'{self._timestamp}.png'
             )
@@ -528,4 +446,7 @@ class Annotator:
     def __call__(self) -> None:
         """Makes Annotator Class callable."""
         self._annotate()
-        self._evaluate()
+
+        if self._manual_correction_file_exists:
+            self._evaluate()
+        
