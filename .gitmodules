@@ -1,3 +1,6 @@
 [submodule "data"]
 	path = data
 	url = https://github.com/Raychani1/Text_Parsing_Methods_Using_NLP_Data
+[submodule "output"]
+	path = output
+	url = https://github.com/Raychani1/Text_Parsing_Methods_Using_NLP_Output
