@@ -45,7 +45,10 @@ PREPROCESSING_REGEX_RULES = {
     r'(\[\s*\d+\s*\])': ' ',
 
     # Split ranges
-    r'(\d)-(\d)': r'\1 až \2',
+    r'(\d)\s*-\s*(\d)': r'\1 až \2',
+
+    # Replace date separators
+    r'(\d{1,2})\.(\d{1,2})\.(\d{4})': r'\1 \2 \3',
 
     # Remove special characters
     r'''['"`‘’„“”\(\)\[\]\/(\s\-|–\s))!?;…\|]|(\.|,)\s*(\.|,)''': ' ',
@@ -78,7 +81,8 @@ PREPROCESSING_REGEX_RULES = {
     r'\s+': ' ',
 
     # Merge larger number formats together
-    r'( [+-]?\d{1,3}) (\d+) ([a-z]*)': r'\1\2 \3',
+    r'( [+-]?\d{1,3}) (\d{3}) (\d{2,3})': r'\1\2\3',
+    r'( [+-]?\d{1,3}) (\d{3}) ([a-z]*)': r'\1\2 \3',
 
     # Remove extra space after letters
     r'(\s+[a-zA-Záäčďéíĺľňóôŕšťúýž]) \.': r'\1.',
@@ -97,6 +101,7 @@ PREPROCESSING_REGEX_RULES = {
 
     # Fix company names
     r'([a-zA-z])\s*&\s*([a-zA-z])': r'\1&\2',
+    r'a\.\s*s[\.]*': 'a.s.',
 
     # Replace specific monetary value
     'desaťtisíc': '10 tisíc',
