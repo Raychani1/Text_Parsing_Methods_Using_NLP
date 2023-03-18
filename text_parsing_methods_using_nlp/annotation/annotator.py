@@ -128,6 +128,7 @@ class Annotator:
             current_ner_tag (List[int]): Current word NER Tag.
         """
         process_messages = [
+            f"Row: {row_index + 1}\n",
             f"ID: {self._data['id'][row_index]}\n",
             f'Token Index: {word_index}\n',
             f"Word: {self._data['text_tokens'][row_index][word_index]}\n",
@@ -340,8 +341,8 @@ class Annotator:
                 s.strip().split('\n') for s in f.read().split('\n\n')
             ]:
                 self._replace_ner_tag(
-                    row_id=int(section[0].split()[-1]),
-                    token_index=int(section[1].split()[-1]),
+                    row_id=int(section[1].split()[-1]),
+                    token_index=int(section[2].split()[-1]),
                     new_tag=INVERTED_NER_LABELS[
                         section[-1].split('--')[-1].strip()
                     ]
