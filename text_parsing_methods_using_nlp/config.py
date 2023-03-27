@@ -143,22 +143,24 @@ PERCENTAGE_LEMMAS = ['%', 'percento', 'p.b']
 #                              Named Entities                                 #
 ###############################################################################
 
-NER_LABELS = {
-    0: '0',
-    1: 'B-Person',
-    2: 'I-Person',
-    3: 'B-Organization',
-    4: 'I-Organization',
-    5: 'B-Location',
-    6: 'I-Location',
-    7: 'B-Date',
-    8: 'I-Date',
-    9: 'Time',
-    10: 'B-Money',
-    11: 'I-Money',
-    12: 'B-Percentage',
-    13: 'I-Percentage',
-}
+NER_LABELS_LIST = [
+    '0',
+    'B-Person',
+    'I-Person',
+    'B-Organization',
+    'I-Organization',
+    'B-Location',
+    'I-Location',
+    'B-Date',
+    'I-Date',
+    'Time',
+    'B-Money',
+    'I-Money',
+    'B-Percentage',
+    'I-Percentage'
+]
+
+NER_LABELS = {key: value for key, value in enumerate(NER_LABELS_LIST)}
 
 INVERTED_NER_LABELS = {label: key for key, label in NER_LABELS.items()}
 
@@ -167,16 +169,40 @@ INVERTED_NER_LABELS = {label: key for key, label in NER_LABELS.items()}
 #                                   Output                                    #
 ###############################################################################
 
-ROOT_OUTPUT_FOLDER = os.path.join(os.getcwd(),'output')
+ROOT_OUTPUT_FOLDER = os.path.join(os.getcwd(), 'output')
 
 CLASSIFICATION_REPORTS_OUTPUT_FOLDER = os.path.join(
     ROOT_OUTPUT_FOLDER,
     'classification_reports'
 )
 
-PLOT_OUTPUT_FOLDER = os.path.join(ROOT_OUTPUT_FOLDER,'plots')
+MODEL_OUTPUT_FOLDER = os.path.join(ROOT_OUTPUT_FOLDER, 'models')
+
+SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER = os.path.join(
+    MODEL_OUTPUT_FOLDER,
+    'slovakbert_ner_model'
+)
+
+SLOVAKBERT_NER_MODEL_CONFIG = os.path.join(
+    SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER,
+    'config.json'
+)
+
+SLOVAKBERT_NER_MODEL_TRAINER_STATE = os.path.join(
+    SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER,
+    'trainer_state.json'
+)
+
+PLOT_OUTPUT_FOLDER = os.path.join(ROOT_OUTPUT_FOLDER, 'plots')
 
 CONFUSION_MATRICES_OUTPUT_FOLDER = os.path.join(
     PLOT_OUTPUT_FOLDER,
     'confusion_matrices'
+)
+
+TOKENIZERS_OUTPUT_FOLDER = os.path.join(ROOT_OUTPUT_FOLDER, 'tokenizers')
+
+SLOVAKBERT_NER_MODEL_TOKENIZER_OUTPUT_FOLDER =  os.path.join(
+    TOKENIZERS_OUTPUT_FOLDER,
+    'slovakbert_ner_model_tokenizer'
 )
