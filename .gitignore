@@ -104,6 +104,3 @@ GitHub.sublime-settings
 !.vscode/launch.json 
 !.vscode/extensions.json 
 .history
-
-# Data
-text_parsing_methods_using_nlp/data/
