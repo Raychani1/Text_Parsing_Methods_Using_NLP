@@ -34,6 +34,7 @@ from text_parsing_methods_using_nlp.config import (
     SLOVAKBERT_NER_MODEL_TOKENIZER_OUTPUT_FOLDER,
     SLOVAKBERT_NER_MODEL_TRAINER_STATE,
 )
+from text_parsing_methods_using_nlp.utils.utils import process_training_history
 
 from pprint import pprint
 
@@ -74,6 +75,7 @@ class CustomCallback(TrainerCallback):
         **kwargs
     ) -> None:
         # TODO - Docstring
+
         self._trainer.evaluate(
             eval_dataset=self._data['test'], 
             metric_key_prefix = 'test'
@@ -306,9 +308,9 @@ class SlovakBertNerModel:
         # TODO - Docstring
 
         self._model.save_pretrained(SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER)
-        self._tokenizer.save_pretrained(
-            SLOVAKBERT_NER_MODEL_TOKENIZER_OUTPUT_FOLDER
-        )
+        # self._tokenizer.save_pretrained(
+        #     SLOVAKBERT_NER_MODEL_TOKENIZER_OUTPUT_FOLDER
+        # )
 
         config = json.load(open(SLOVAKBERT_NER_MODEL_CONFIG))
 
@@ -322,10 +324,11 @@ class SlovakBertNerModel:
     def _plot_model_metrics(self) -> None:
         # TODO - Docstring
 
-        with open(SLOVAKBERT_NER_MODEL_TRAINER_STATE) as json_file:
-            data = json.load(json_file)['log_history']
+        training_history = process_training_history(
+            training_history_path=SLOVAKBERT_NER_MODEL_TRAINER_STATE
+        )
 
-        pprint(data)
+        print(training_history.head())
         
         # TODO - Finish function
 
@@ -337,7 +340,7 @@ class SlovakBertNerModel:
     def evaluate(self) -> None:
         # TODO - Docstring
 
-        self._save_model()
+        # self._save_model()
         self._plot_model_metrics()
 
     def predict(self) -> None:
@@ -356,6 +359,6 @@ class SlovakBertNerModel:
         pprint(nlp(example))
 
     def __call__(self) -> None:
-        self.train()
+        # self.train()
         self.evaluate()
-        self.predict()
+        # self.predict()
