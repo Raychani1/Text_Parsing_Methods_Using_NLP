@@ -78,8 +78,8 @@ class Annotator:
         )[:self._dataset_size]
 
         self._output_file_prefix = (
-            input_data_filename if self._model_test_dataset_evaluation else 
-            f'{input_data_filename}_{self._dataset_size}' 
+            input_data_filename if self._model_test_dataset_evaluation else
+            f'{input_data_filename}_{self._dataset_size}'
         )
 
         self._manual_correction_filepath = (
@@ -105,7 +105,7 @@ class Annotator:
             CLASSIFICATION_REPORTS_OUTPUT_FOLDER,
             f"{self._output_file_prefix}_class_report_{self._timestamp}.txt"
         )
-        
+
         self._output_path = os.path.join(
             ANNOTATED_DATA_FOLDER,
             f"{self._output_file_prefix}_Annotated_{self._timestamp}.csv"
@@ -135,7 +135,7 @@ class Annotator:
         # Tokenize text and lemmas
         for col in ['text', 'lemma_text']:
             self._data[f'{col}_tokens'] = self._data[col].str.split(' ')
-    
+
     def _document_annotation_process(
         self,
         row_index: int,
@@ -143,7 +143,7 @@ class Annotator:
         current_ner_tag: List[int]
     ) -> None:
         """Documents annotation process.
-        
+
             This will allows us to create a manual correction file.
 
         Args:
@@ -266,9 +266,9 @@ class Annotator:
 
         # Select Tokens
         (
-            previous_word_lemma, 
-            current_word, 
-            current_word_lemma, 
+            previous_word_lemma,
+            current_word,
+            current_word_lemma,
             next_word_lemma
         ) = self._select_tokens(row, word_index)
 
@@ -382,19 +382,19 @@ class Annotator:
         fixed_ner_tags_col = []
 
         for i in range(self._dataset_size):
-            
+
             print(f'Annotation Progress: {i} / {self._dataset_size}')
 
             classifications = self._ner_pipeline(
                 ' '.join(
                     re.sub(
-                        r'[\'\s+]+', 
+                        r'[\'\s+]+',
                         ' ',
                         self._data['tokens'][i][1:-1]).strip().split(' ')
                 )
-                if self._model_test_dataset_evaluation 
+                if self._model_test_dataset_evaluation
                 else self._data['text'][i]
-            )      
+            )
 
             word_index = 0
             ner_tags = []
@@ -409,7 +409,7 @@ class Annotator:
                 if (
                     index < len(classifications) - 1 and
                     not classifications[index + 1]['word'].startswith(
-                        tuple(['Ġ', ','])
+                        'Ġ'
                     )
                 ):
                     continue
@@ -459,7 +459,7 @@ class Annotator:
 
     @staticmethod
     def replace(x):
-        for what, new in INVERTED_NER_LABELS.items(): # or iteritems in Python 2
+        for what, new in INVERTED_NER_LABELS.items():
             x = x.replace(what, str(new))
         return x
 
@@ -469,7 +469,7 @@ class Annotator:
         self._data = pd.read_csv(self._output_path)
 
         true_column = (
-            'ner_tags' if self._model_test_dataset_evaluation else 
+            'ner_tags' if self._model_test_dataset_evaluation else
             'fixed_ner_tags'
         )
 
@@ -481,11 +481,11 @@ class Annotator:
             self._data[true_column] = self._data[true_column].apply(
                 lambda x: [
                     int(i) for i in re.sub(
-                        r'\s+', 
-                        ' ', 
+                        r'\s+',
+                        ' ',
                         x[1:-1]
                     ).strip().split(' ')
-                ]             
+                ]
             )
         else:
             # Turn String cols to List[int] values
@@ -500,9 +500,6 @@ class Annotator:
         y_pred = pd.Series(
             list(itertools.chain(*self._data['model_ner_tags'].tolist()))
         )
-
-        print('Y True: ', set(list(itertools.chain(*self._data[true_column].tolist()))))
-        print('Y Pred: ', set(list(itertools.chain(*self._data['model_ner_tags'].tolist()))))
 
         # Evaluate Model Performance
         with open(self._classification_report_output_path, 'w+') as output:
@@ -527,8 +524,7 @@ class Annotator:
         self._annotate()
 
         if (
-            self._manual_correction_file_exists or 
+            self._manual_correction_file_exists or
             self._model_test_dataset_evaluation
         ):
             self._evaluate()
-        
