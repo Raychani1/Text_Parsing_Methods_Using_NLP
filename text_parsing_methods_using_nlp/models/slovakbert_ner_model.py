@@ -4,6 +4,7 @@
 import csv
 import json
 import os
+import re
 from copy import deepcopy
 from datetime import datetime
 
@@ -166,6 +167,13 @@ class SlovakBertNerModel:
 
         test_data_pd = test_dataset.to_pandas(batch_size=32)
 
+        regex = re.compile(r'(.*\'.*)')
+        regex_match = np.vectorize(lambda x: bool(regex.match(x)))
+
+        test_data_pd = test_data_pd[
+            test_data_pd['tokens'].apply(lambda x: not any(regex_match(x)))
+        ]
+
         self._test_dataset_length = len(test_data_pd)
         
         test_data_pd[['tokens', 'ner_tags']].to_csv(
@@ -173,6 +181,15 @@ class SlovakBertNerModel:
             index=False,
             quoting=csv.QUOTE_NONNUMERIC
         )
+
+    @staticmethod
+    def filter_func(example):
+        tokens = example['tokens']
+
+        for token in tokens:
+            if any(re.findall(r'\d+', token)):
+                    return False
+        return True
 
     def _load_data(self, concat_with_wikiann=True) -> DatasetDict:
         # TODO - Docstring
@@ -187,7 +204,7 @@ class SlovakBertNerModel:
                     ['langs', 'spans']
                 ).cast_column(
                     'ner_tags', Sequence(feature=Value(dtype='int64', id=None))
-                )
+                ).filter(lambda x: self.filter_func(x))
 
         data = pd.read_csv(
             os.path.join(
@@ -222,10 +239,6 @@ class SlovakBertNerModel:
             )
 
             self._save_test_data_to_csv(test_dataset)
-
-            pd_data = pd.read_csv(self._test_dataset_output_path)
-
-            print(pd_data.head())
 
             return DatasetDict(
                 {
