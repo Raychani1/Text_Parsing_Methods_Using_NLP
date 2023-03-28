@@ -18,6 +18,11 @@ ANNOTATION_PROCESS_OUTPUT_FOLDER = os.path.join(
     'annotation_process_output'
 )
 
+MODEL_TEST_DATASET_FOLDER = os.path.join(
+    ROOT_DATA_FOLDER,
+    'model_test_dataset'
+)
+
 ANNOTATED_DATA_FOLDER = os.path.join(ROOT_DATA_FOLDER, 'annotated')
 
 DATA_CONFIG = {
