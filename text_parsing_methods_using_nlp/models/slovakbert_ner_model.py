@@ -1,6 +1,7 @@
 # SOURCE:
 # https://www.youtube.com/watch?v=dzyDHMycx_c
 
+import csv
 import json
 import os
 from copy import deepcopy
@@ -19,15 +20,17 @@ from transformers import (
     DataCollatorForTokenClassification,
     RobertaTokenizerFast,
     Trainer,
-    TrainerCallback, 
+    TrainerCallback,
     TrainerControl,
     TrainerState,
     TrainingArguments,
 )
 
+from text_parsing_methods_using_nlp.annotation.annotator import Annotator
 from text_parsing_methods_using_nlp.config import (
     ANNOTATED_DATA_FOLDER,
     INVERTED_NER_LABELS,
+    MODEL_TEST_DATASET_FOLDER,
     NER_LABELS,
     NER_LABELS_LIST,
     SLOVAKBERT_NER_MODEL_CONFIG,
@@ -40,23 +43,24 @@ from text_parsing_methods_using_nlp.utils.utils import process_training_history
 
 from pprint import pprint
 
+
 class CustomCallback(TrainerCallback):
     # SOURCE: https://stackoverflow.com/a/70564009/14319439
 
     # TODO - Docstring
-    
+
     def __init__(self, trainer, data) -> None:
         # TODO - Docstring
 
         super().__init__()
         self._trainer = trainer
         self._data = data
-    
+
     def on_step_end(
         self,
-        args: TrainingArguments, 
-        state: TrainerState, 
-        control: TrainerControl, 
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
         **kwargs
     ) -> (TrainerControl | None):
         # TODO - Docstring
@@ -65,24 +69,24 @@ class CustomCallback(TrainerCallback):
             control_copy = deepcopy(control)
 
             self._trainer.evaluate(
-                eval_dataset=self._trainer.train_dataset, 
+                eval_dataset=self._trainer.train_dataset,
                 metric_key_prefix="train"
             )
 
             return control_copy
 
     def on_train_end(
-        self, 
-        args: TrainingArguments, 
-        state: TrainerState, 
-        control: TrainerControl, 
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
         **kwargs
     ) -> None:
         # TODO - Docstring
 
         self._trainer.evaluate(
-            eval_dataset=self._data['test'], 
-            metric_key_prefix = 'test'
+            eval_dataset=self._data['test'],
+            metric_key_prefix='test'
         )
 
         return super().on_train_end(args, state, control, **kwargs)
@@ -97,9 +101,19 @@ class SlovakBertNerModel:
 
         self._timestamp = datetime.now().strftime('%d_%m_%Y__%H_%M_%S')
 
+        self._seed = 42
+
+        self._test_dataset_file_name = 'SlovakBERT_NER_Model_Test_Dataset'
+
+        self._test_dataset_output_path = os.path.join(
+            MODEL_TEST_DATASET_FOLDER, 
+            f'{self._test_dataset_file_name}_{self._timestamp}.csv'
+        )
+        self._test_dataset_length = 0
+
         self._tokenizer = RobertaTokenizerFast.from_pretrained(
             pretrained_model_name_or_path='crabz/slovakbert-ner'
-            
+
         )
 
         self._model = AutoModelForTokenClassification.from_pretrained(
@@ -116,7 +130,7 @@ class SlovakBertNerModel:
             lr_scheduler_type='linear',
             num_train_epochs=15,
             # num_train_epochs=1,   # Only for testing purposes
-            seed=42,
+            seed=self._seed,
             save_total_limit=2,
             adam_beta1=0.9,
             adam_beta2=0.999,
@@ -138,14 +152,27 @@ class SlovakBertNerModel:
             tokenizer=self._tokenizer,
             compute_metrics=self._compute_metrics,
         )
-        
+
         self._trainer.add_callback(
             CustomCallback(trainer=self._trainer, data=self._data)
-        ) 
+        )
 
         self._metric = evaluate.load(path='seqeval')
 
         self._plotter = Plotter()
+
+    def _save_test_data_to_csv(self, test_dataset: Dataset) -> None:
+        # TODO - Docstring
+
+        test_data_pd = test_dataset.to_pandas(batch_size=32)
+
+        self._test_dataset_length = len(test_data_pd)
+        
+        test_data_pd[['tokens', 'ner_tags']].to_csv(
+            path_or_buf=self._test_dataset_output_path, 
+            index=False,
+            quoting=csv.QUOTE_NONNUMERIC
+        )
 
     def _load_data(self, concat_with_wikiann=True) -> DatasetDict:
         # TODO - Docstring
@@ -158,12 +185,9 @@ class SlovakBertNerModel:
             for split in wikiann_data.keys():
                 wikiann_data[split] = wikiann_data[split].remove_columns(
                     ['langs', 'spans']
+                ).cast_column(
+                    'ner_tags', Sequence(feature=Value(dtype='int64', id=None))
                 )
-
-            tokenized_wikiann_data = wikiann_data.map(
-                self._tokenize_and_align_labels,
-                batched=True
-            )
 
         data = pd.read_csv(
             os.path.join(
@@ -180,58 +204,52 @@ class SlovakBertNerModel:
 
         data.columns = ['tokens', 'ner_tags']
 
-        train_test = Dataset.from_pandas(data).map(
-            self._tokenize_and_align_labels,
-            batched=True
-        ).train_test_split(train_size=0.8, test_size=0.2)
+        train_test = Dataset.from_pandas(data).train_test_split(
+            train_size=0.8,
+            test_size=0.2,
+            seed=self._seed
+        )
 
         train_valid = train_test['train'].train_test_split(
             train_size=0.8,
-            test_size=0.2
+            test_size=0.2,
+            seed=self._seed
         )
 
         if concat_with_wikiann:
-            train_dataset = concatenate_datasets(
-                [
-                    train_valid['train'],
-                    tokenized_wikiann_data['train'].cast_column(
-                        'ner_tags',
-                        Sequence(feature=Value(dtype='int64', id=None))
-                    )
-                ]
-            )
-
-            validation_dataset = concatenate_datasets(
-                [
-                    train_valid['train'],
-                    tokenized_wikiann_data['validation'].cast_column(
-                        'ner_tags',
-                        Sequence(feature=Value(dtype='int64', id=None))
-                    )
-                ]
-            )
-
             test_dataset = concatenate_datasets(
-                [
-                    train_test['test'],
-                    tokenized_wikiann_data['test'].cast_column(
-                        'ner_tags',
-                        Sequence(feature=Value(dtype='int64', id=None))
-                    )
-                ]
+                [train_test['test'], wikiann_data['test']]
             )
 
-            return DatasetDict({
-                'train': train_dataset,
-                'test': validation_dataset,
-                'validation': test_dataset
-            })
+            self._save_test_data_to_csv(test_dataset)
+
+            pd_data = pd.read_csv(self._test_dataset_output_path)
+
+            print(pd_data.head())
+
+            return DatasetDict(
+                {
+                    'train': concatenate_datasets(
+                        [train_valid['train'], wikiann_data['train']]
+                    ),
+                    'validation': concatenate_datasets(
+                        [train_valid['train'], wikiann_data['validation']]
+                    ),
+                    'test': test_dataset,
+                }
+            ).map(
+                self._tokenize_and_align_labels,
+                batched=True
+            )
 
         return DatasetDict({
             'train': train_valid['train'],
-            'test': train_test['test'],
-            'validation': train_valid['test']
-        })
+            'validation': train_valid['test'],
+            'test': train_test['test']
+        }).map(
+            self._tokenize_and_align_labels,
+            batched=True
+        )
 
     def _tokenize_and_align_labels(
         self,
@@ -343,7 +361,7 @@ class SlovakBertNerModel:
             path=TRAINING_HISTORIES_OUTPUT_FOLDER,
             timestamp=self._timestamp
         )
-        
+
         # TODO - Finish function
 
     def train(self) -> None:
@@ -354,8 +372,23 @@ class SlovakBertNerModel:
     def evaluate(self) -> None:
         # TODO - Docstring
 
-        # self._save_model()
+        self._save_model()
         self._plot_model_metrics()
+
+        annotator = Annotator(
+            input_data_filepath=self._test_dataset_output_path,
+            input_data_filename=self._test_dataset_file_name,
+            dataset_size=self._test_dataset_length,
+            model_test_dataset_evaluation=True,
+            timestamp=self._timestamp, 
+            model=AutoModelForTokenClassification.from_pretrained(
+                SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER
+            ).to('cpu'),
+            tokenizer=self._tokenizer
+        )
+
+        annotator()
+
 
     def predict(self) -> None:
         model_fine_tuned = AutoModelForTokenClassification.from_pretrained(
@@ -373,6 +406,6 @@ class SlovakBertNerModel:
         pprint(nlp(example))
 
     def __call__(self) -> None:
-        # self.train()
+        self.train()
         self.evaluate()
         # self.predict()

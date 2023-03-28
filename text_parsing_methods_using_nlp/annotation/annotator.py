@@ -3,7 +3,7 @@ import itertools
 import os
 import re
 from datetime import datetime
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 import pandas as pd
 from sklearn.metrics import classification_report, confusion_matrix
@@ -38,7 +38,12 @@ class Annotator:
         self,
         manual_correction_filepath: str = None,
         input_data_filepath: str = config['raw_input_data_path'],
-        dataset_size: int = config['dataset_size']
+        input_data_filename: str = config['file_name'],
+        dataset_size: int = config['dataset_size'],
+        model_test_dataset_evaluation: bool = False,
+        model: Any = 'crabz/slovakbert-ner',
+        tokenizer: Any = 'crabz/slovakbert-ner',
+        timestamp: str = datetime.now().strftime('%d_%m_%Y__%H_%M_%S')
     ) -> None:
         """Initializes the Annotator Class.
 
@@ -47,19 +52,34 @@ class Annotator:
             Path. Defaults to None.
             input_data_filepath (str, optional): Input Data File Path. Defaults
             to 'NBS_sentence.csv'.
+            input_data_filename (str, optional): Input Data File Name. Defaults
+            to 'NBS_sentence'.
             dataset_size (int, optional): Size of dataset to process. Defaults
             to NBS_sentence length - 8445.
+            model_test_dataset_evaluation (bool, optional): Determines if the
+            annotator is used for model performance evaluation on Test dataset.
+            Defaults to False.
+            model (Any, optional): NER Model used for prediction / evaluation.
+            Defaults to 'crabz/slovakbert-ner'.
+            tkenizer (Any, optional): Tokenizer used in pipeline. Defaults to 
+            'crabz/slovakbert-ner'.
+            timestamp (str, optional): Timestamp for output files. Defaults to 
+            current date time timestamp formatted in '%d_%m_%Y__%H_%M_%S'
+            format.
         """
-        self._timestamp = datetime.now().strftime('%d_%m_%Y__%H_%M_%S')
+        self._timestamp = timestamp
 
         self._dataset_size = dataset_size
+
+        self._model_test_dataset_evaluation = model_test_dataset_evaluation
 
         self._data = pd.read_csv(
             input_data_filepath, delimiter=',', encoding='utf-8'
         )[:self._dataset_size]
 
         self._output_file_prefix = (
-            f"{config['file_name']}_{self._dataset_size}"
+            input_data_filename if self._model_test_dataset_evaluation else 
+            f'{input_data_filename}_{self._dataset_size}' 
         )
 
         self._manual_correction_filepath = (
@@ -91,7 +111,11 @@ class Annotator:
             f"{self._output_file_prefix}_Annotated_{self._timestamp}.csv"
         )
 
-        self._ner_pipeline = pipeline(task='ner', model='crabz/slovakbert-ner')
+        self._ner_pipeline = pipeline(
+            task='ner',
+            model=model,
+            tokenizer=tokenizer
+        )
 
         self._plotter = Plotter()
 
@@ -350,13 +374,27 @@ class Annotator:
 
     def _annotate(self) -> None:
         """Annotates input dataset."""
-        self._preprocess_data()
+
+        if not self._model_test_dataset_evaluation:
+            self._preprocess_data()
 
         ner_tags_col = []
         fixed_ner_tags_col = []
 
         for i in range(self._dataset_size):
-            classifications = self._ner_pipeline(self._data['text'][i])
+            
+            print(f'Annotation Progress: {i} / {self._dataset_size}')
+
+            classifications = self._ner_pipeline(
+                ' '.join(
+                    re.sub(
+                        r'[\'\s+]+', 
+                        ' ',
+                        self._data['tokens'][i][1:-1]).strip().split(' ')
+                )
+                if self._model_test_dataset_evaluation 
+                else self._data['text'][i]
+            )      
 
             word_index = 0
             ner_tags = []
@@ -379,58 +417,98 @@ class Annotator:
                 # Save model prediction
                 ner_tags.extend(current_ner_tag)
 
-                # Correct model prediction if needed
-                current_ner_tag = self._fix_ner_tags(
-                    ner_tags=current_ner_tag,
-                    row=i,
-                    word_index=word_index
-                )
+                if not self._model_test_dataset_evaluation:
 
-                # Save corrected values
-                fixed_ner_tags.extend(current_ner_tag)
+                    # TODO - Extract functionality to reduce complexity
 
-                if not self._manual_correction_file_exists:
-                    self._document_annotation_process(
-                        row_index=i,
-                        word_index=word_index,
-                        current_ner_tag=current_ner_tag
+                    # Correct model prediction if needed
+                    current_ner_tag = self._fix_ner_tags(
+                        ner_tags=current_ner_tag,
+                        row=i,
+                        word_index=word_index
                     )
+
+                    # Save corrected values
+                    fixed_ner_tags.extend(current_ner_tag)
+
+                    if not self._manual_correction_file_exists:
+                        self._document_annotation_process(
+                            row_index=i,
+                            word_index=word_index,
+                            current_ner_tag=current_ner_tag
+                        )
 
                 word_index += 1
 
                 current_ner_tag = []
 
             ner_tags_col.append(ner_tags)
-            fixed_ner_tags_col.append(fixed_ner_tags)
 
-        self._data['ner_tags'] = ner_tags_col
-        self._data['fixed_ner_tags'] = fixed_ner_tags_col
+            if not self._model_test_dataset_evaluation:
+                fixed_ner_tags_col.append(fixed_ner_tags)
+
+        self._data['model_ner_tags'] = ner_tags_col
+
+        if not self._model_test_dataset_evaluation:
+            self._data['fixed_ner_tags'] = fixed_ner_tags_col
 
         if self._manual_correction_file_exists:
             self._manual_correction()
 
         self._save_data()
 
+    @staticmethod
+    def replace(x):
+        for what, new in INVERTED_NER_LABELS.items(): # or iteritems in Python 2
+            x = x.replace(what, str(new))
+        return x
+
     def _evaluate(self) -> None:
         """Evaluates Model Performance based on predicted and corrected 
         values."""
         self._data = pd.read_csv(self._output_path)
 
-        # Turn String cols to List[int] values
-        self._data['ner_tags'] = self._data['ner_tags'].apply(eval)
-        self._data['fixed_ner_tags'] = self._data['fixed_ner_tags'].apply(eval)
+        true_column = (
+            'ner_tags' if self._model_test_dataset_evaluation else 
+            'fixed_ner_tags'
+        )
 
+        if self._model_test_dataset_evaluation:
+            self._data['model_ner_tags'] = self._data['model_ner_tags'].apply(
+                eval
+            ).apply(lambda a: list(map(int, list(map(self.replace, a)))))
+
+            self._data[true_column] = self._data[true_column].apply(
+                lambda x: [
+                    int(i) for i in re.sub(
+                        r'\s+', 
+                        ' ', 
+                        x[1:-1]
+                    ).strip().split(' ')
+                ]             
+            )
+        else:
+            # Turn String cols to List[int] values
+            self._data['model_ner_tags'] = self._data['model_ner_tags'].apply(
+                eval
+            )
+            self._data[true_column] = self._data[true_column].apply(eval)
         # Merge DataFrame rows together
         y_true = pd.Series(
-            list(itertools.chain(*self._data['fixed_ner_tags'].tolist()))
+            list(itertools.chain(*self._data[true_column].tolist()))
         )
         y_pred = pd.Series(
-            list(itertools.chain(*self._data['ner_tags'].tolist()))
+            list(itertools.chain(*self._data['model_ner_tags'].tolist()))
         )
+
+        print('Y True: ', set(list(itertools.chain(*self._data[true_column].tolist()))))
+        print('Y Pred: ', set(list(itertools.chain(*self._data['model_ner_tags'].tolist()))))
 
         # Evaluate Model Performance
         with open(self._classification_report_output_path, 'w+') as output:
             output.write(classification_report(y_true, y_pred))
+
+        print(confusion_matrix(y_true, y_pred))
 
         # Generate Confusion Matrix
         self._plotter.display_confusion_matrix(
@@ -448,6 +526,9 @@ class Annotator:
         """Makes Annotator Class callable."""
         self._annotate()
 
-        if self._manual_correction_file_exists:
+        if (
+            self._manual_correction_file_exists or 
+            self._model_test_dataset_evaluation
+        ):
             self._evaluate()
         
