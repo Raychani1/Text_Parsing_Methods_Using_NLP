@@ -4,6 +4,7 @@
 import json
 import os
 from copy import deepcopy
+from datetime import datetime
 
 import evaluate
 import numpy as np
@@ -17,11 +18,11 @@ from transformers import (
     AutoModelForTokenClassification,
     DataCollatorForTokenClassification,
     RobertaTokenizerFast,
-    TrainingArguments,
     Trainer,
     TrainerCallback, 
     TrainerControl,
-    TrainerState
+    TrainerState,
+    TrainingArguments,
 )
 
 from text_parsing_methods_using_nlp.config import (
@@ -31,9 +32,10 @@ from text_parsing_methods_using_nlp.config import (
     NER_LABELS_LIST,
     SLOVAKBERT_NER_MODEL_CONFIG,
     SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER,
-    SLOVAKBERT_NER_MODEL_TOKENIZER_OUTPUT_FOLDER,
     SLOVAKBERT_NER_MODEL_TRAINER_STATE,
+    TRAINING_HISTORIES_OUTPUT_FOLDER
 )
+from text_parsing_methods_using_nlp.ops.plotter import Plotter
 from text_parsing_methods_using_nlp.utils.utils import process_training_history
 
 from pprint import pprint
@@ -61,10 +63,12 @@ class CustomCallback(TrainerCallback):
 
         if control.should_evaluate:
             control_copy = deepcopy(control)
+
             self._trainer.evaluate(
                 eval_dataset=self._trainer.train_dataset, 
                 metric_key_prefix="train"
             )
+
             return control_copy
 
     def on_train_end(
@@ -80,6 +84,7 @@ class CustomCallback(TrainerCallback):
             eval_dataset=self._data['test'], 
             metric_key_prefix = 'test'
         )
+
         return super().on_train_end(args, state, control, **kwargs)
 
 
@@ -89,6 +94,8 @@ class SlovakBertNerModel:
 
     def __init__(self) -> None:
         # TODO - Docstring
+
+        self._timestamp = datetime.now().strftime('%d_%m_%Y__%H_%M_%S')
 
         self._tokenizer = RobertaTokenizerFast.from_pretrained(
             pretrained_model_name_or_path='crabz/slovakbert-ner'
@@ -137,6 +144,8 @@ class SlovakBertNerModel:
         ) 
 
         self._metric = evaluate.load(path='seqeval')
+
+        self._plotter = Plotter()
 
     def _load_data(self, concat_with_wikiann=True) -> DatasetDict:
         # TODO - Docstring
@@ -328,7 +337,12 @@ class SlovakBertNerModel:
             training_history_path=SLOVAKBERT_NER_MODEL_TRAINER_STATE
         )
 
-        print(training_history.head())
+        self._plotter.display_training_history(
+            history=training_history,
+            index_col='epoch',
+            path=TRAINING_HISTORIES_OUTPUT_FOLDER,
+            timestamp=self._timestamp
+        )
         
         # TODO - Finish function
 

@@ -200,6 +200,11 @@ CONFUSION_MATRICES_OUTPUT_FOLDER = os.path.join(
     'confusion_matrices'
 )
 
+TRAINING_HISTORIES_OUTPUT_FOLDER = os.path.join(
+    PLOT_OUTPUT_FOLDER,
+    'training_history'
+)
+
 TOKENIZERS_OUTPUT_FOLDER = os.path.join(ROOT_OUTPUT_FOLDER, 'tokenizers')
 
 SLOVAKBERT_NER_MODEL_TOKENIZER_OUTPUT_FOLDER =  os.path.join(
