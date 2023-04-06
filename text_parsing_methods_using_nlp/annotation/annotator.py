@@ -8,12 +8,16 @@ from typing import Any, List, Tuple
 import pandas as pd
 from sklearn.metrics import classification_report, confusion_matrix
 from transformers import pipeline
+from tqdm import tqdm
 
 from text_parsing_methods_using_nlp.config import (
     ANNOTATED_DATA_FOLDER,
+    ANNOTATED_DATA_FOLDER_SLOVAKBERT_NER_VERSION,
     ANNOTATION_PROCESS_OUTPUT_FOLDER,
     CLASSIFICATION_REPORTS_OUTPUT_FOLDER,
+    CLASSIFICATION_REPORTS_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION,
     CONFUSION_MATRICES_OUTPUT_FOLDER,
+    CONFUSION_MATRICES_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION,
     DATA_CONFIG,
     INVERTED_NER_LABELS,
     MANUAL_CORRECTION_DATA_FOLDER,
@@ -42,6 +46,7 @@ class Annotator:
         dataset_size: int = config['dataset_size'],
         model_test_dataset_evaluation: bool = False,
         model: Any = 'crabz/slovakbert-ner',
+        model_name: str = 'Crabz_-_SlovakBERT_NER_Model',
         tokenizer: Any = 'crabz/slovakbert-ner',
         timestamp: str = datetime.now().strftime('%d_%m_%Y__%H_%M_%S')
     ) -> None:
@@ -56,22 +61,33 @@ class Annotator:
             to 'NBS_sentence'.
             dataset_size (int, optional): Size of dataset to process. Defaults
             to NBS_sentence length - 8445.
-            model_test_dataset_evaluation (bool, optional): Determines if the
+            model_test_dataset_evaluation (bool, optional): Determines if the 
             annotator is used for model performance evaluation on Test dataset.
             Defaults to False.
             model (Any, optional): NER Model used for prediction / evaluation.
             Defaults to 'crabz/slovakbert-ner'.
-            tkenizer (Any, optional): Tokenizer used in pipeline. Defaults to 
+            model_name (str, optional): NER Model name. Defaults to 
+            'Crabz_-_SlovakBERT_NER_Model'.
+            tokenizer (Any, optional): Tokenizer used in pipeline. Defaults to 
             'crabz/slovakbert-ner'.
             timestamp (str, optional): Timestamp for output files. Defaults to 
             current date time timestamp formatted in '%d_%m_%Y__%H_%M_%S'
             format.
         """
+        self._model_name = model_name
+
+        self._model_version = (
+            None if not self._model_name[-1].isdigit()
+            else self._model_name[-5:]
+        )
+
         self._timestamp = timestamp
 
         self._dataset_size = dataset_size
 
         self._model_test_dataset_evaluation = model_test_dataset_evaluation
+
+        self._input_data_filename = input_data_filename
 
         self._data = pd.read_csv(
             input_data_filepath, delimiter=',', encoding='utf-8'
@@ -97,18 +113,28 @@ class Annotator:
         self._annotation_process_output_path = (
             None if self._manual_correction_file_exists else os.path.join(
                 ANNOTATION_PROCESS_OUTPUT_FOLDER,
-                f"{self._output_file_prefix}_Process_{self._timestamp}.txt"
+                f'{self._output_file_prefix}_Process_{self._timestamp}.txt'
             )
         )
 
         self._classification_report_output_path = os.path.join(
-            CLASSIFICATION_REPORTS_OUTPUT_FOLDER,
-            f"{self._output_file_prefix}_class_report_{self._timestamp}.txt"
+            (
+                CLASSIFICATION_REPORTS_OUTPUT_FOLDER if
+                self._model_version is None else
+                CLASSIFICATION_REPORTS_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION
+            ),
+            self._model_name,
+            f'{self._output_file_prefix}_class_report_{self._timestamp}.txt'
         )
 
         self._output_path = os.path.join(
-            ANNOTATED_DATA_FOLDER,
-            f"{self._output_file_prefix}_Annotated_{self._timestamp}.csv"
+            (
+                ANNOTATED_DATA_FOLDER if self._model_version is None
+                else ANNOTATED_DATA_FOLDER_SLOVAKBERT_NER_VERSION
+            ),
+            self._model_name,
+            f'{self._model_name}_{self._output_file_prefix}_Annotated_'
+            f'{self._timestamp}.csv'
         )
 
         self._ner_pipeline = pipeline(
@@ -282,22 +308,6 @@ class Annotator:
 
         # Process Number
         elif re.compile(r'[+-]?\d+\.\d+|[+-]?\d').match(current_word):
-            # # Old Version
-            # if (
-            #     next_word_lemma in MONTH_LEMMAS or
-            #     previous_word_lemma in YEAR_PREFIX_LEMMAS
-            # ):
-            #     new_ner_tags.append(7)
-            # elif previous_word_lemma in MONTH_LEMMAS or ner_tags[-1] == 7:
-            #     new_ner_tags.append(8)
-            # elif next_word_lemma in MONEY_LEMMAS:
-            #     new_ner_tags.append(10)
-            # elif next_word_lemma in PERCENTAGE_LEMMAS:
-            #     new_ner_tags.append(12)
-            # else:
-            #     new_ner_tags.append(0)
-
-            # Refactored Version
             new_ner_tags.append(
                 self._process_numbers(
                     ner_tags,
@@ -381,9 +391,9 @@ class Annotator:
         ner_tags_col = []
         fixed_ner_tags_col = []
 
-        for i in range(self._dataset_size):
+        for i in tqdm(range(self._dataset_size)):
 
-            print(f'Annotation Progress: {i} / {self._dataset_size}')
+            # print(f'Annotation Progress: {i} / {self._dataset_size}')
 
             classifications = self._ner_pipeline(
                 ' '.join(
@@ -505,16 +515,23 @@ class Annotator:
         with open(self._classification_report_output_path, 'w+') as output:
             output.write(classification_report(y_true, y_pred))
 
-        print(confusion_matrix(y_true, y_pred))
-
         # Generate Confusion Matrix
         self._plotter.display_confusion_matrix(
             conf_matrix=confusion_matrix(y_true, y_pred),
-            title=f'SlovakBERT NER {self._dataset_size} Confusion Matrix',
+            title=(
+                f'{self._model_name} {self._input_data_filename} '
+                f'{self._dataset_size} Confusion Matrix'
+            ),
             labels=INVERTED_NER_LABELS.keys(),
+            percentages=True,
             path=os.path.join(
-                CONFUSION_MATRICES_OUTPUT_FOLDER,
-                f'slovakbert_ner_{self._dataset_size}_conf_matrix_'
+                (
+                    CONFUSION_MATRICES_OUTPUT_FOLDER if
+                    self._model_version is None else
+                    CONFUSION_MATRICES_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION
+                ),
+                self._model_name,
+                f'{self._model_name}_{self._dataset_size}_conf_matrix_'
                 f'{self._timestamp}.png'
             )
         )

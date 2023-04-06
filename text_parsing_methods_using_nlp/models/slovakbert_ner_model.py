@@ -1,5 +1,4 @@
-# SOURCE:
-# https://www.youtube.com/watch?v=dzyDHMycx_c
+# SOURCE: https://www.youtube.com/watch?v=dzyDHMycx_c
 
 import csv
 import json
@@ -7,6 +6,7 @@ import os
 import re
 from copy import deepcopy
 from datetime import datetime
+from typing import Any
 
 import evaluate
 import numpy as np
@@ -19,6 +19,8 @@ from transformers import (
     pipeline,
     AutoModelForTokenClassification,
     DataCollatorForTokenClassification,
+    EarlyStoppingCallback,
+    IntervalStrategy,
     RobertaTokenizerFast,
     Trainer,
     TrainerCallback,
@@ -31,13 +33,11 @@ from text_parsing_methods_using_nlp.annotation.annotator import Annotator
 from text_parsing_methods_using_nlp.config import (
     ANNOTATED_DATA_FOLDER,
     INVERTED_NER_LABELS,
+    MODEL_OUTPUT_FOLDER,
     MODEL_TEST_DATASET_FOLDER,
     NER_LABELS,
-    NER_LABELS_LIST,
-    SLOVAKBERT_NER_MODEL_CONFIG,
-    SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER,
-    SLOVAKBERT_NER_MODEL_TRAINER_STATE,
-    TRAINING_HISTORIES_OUTPUT_FOLDER
+    NER_LABELS_LIST,    
+    TRAINING_HISTORIES_OUTPUT_FOLDER,
 )
 from text_parsing_methods_using_nlp.ops.plotter import Plotter
 from text_parsing_methods_using_nlp.utils.utils import process_training_history
@@ -45,14 +45,23 @@ from text_parsing_methods_using_nlp.utils.utils import process_training_history
 from pprint import pprint
 
 
-class CustomCallback(TrainerCallback):
+class SlovakBertNerModelCallback(TrainerCallback):
     # SOURCE: https://stackoverflow.com/a/70564009/14319439
 
-    # TODO - Docstring
+    """Represents custom SlovakBERT NER Model Callbacks.
 
-    def __init__(self, trainer, data) -> None:
-        # TODO - Docstring
+    These Callbacks are used during and at the end of Model training for 
+    additional evaluation metric generation.
+    """
 
+    def __init__(self, trainer: Trainer, data: DatasetDict) -> None:
+        """Initializes the SlovakBertNerModelCallback Class.
+
+        Args:
+            trainer (Trainer): SlovakBERT NER Model Trainer.
+            data (DatasetDict): Datasets used during training, validation
+            and testing.
+        """
         super().__init__()
         self._trainer = trainer
         self._data = data
@@ -62,16 +71,26 @@ class CustomCallback(TrainerCallback):
         args: TrainingArguments,
         state: TrainerState,
         control: TrainerControl,
-        **kwargs
+        **kwargs: dict[str, Any]
     ) -> (TrainerControl | None):
-        # TODO - Docstring
+        """Triggers 'On Step End' evaluation.
 
+        Args:
+            args (TrainingArguments): Model Training Arguments.
+            state (TrainerState): Current Model Trainer State.
+            control (TrainerControl): Current Model Trainer Controller.
+            **kwargs (dict[str, Any]): Additional Keyword Arguments.
+
+        Returns:
+            TrainerControl | None: TrainerControl if evaluation is needed,
+            None otherwise.
+        """
         if control.should_evaluate:
             control_copy = deepcopy(control)
 
             self._trainer.evaluate(
                 eval_dataset=self._trainer.train_dataset,
-                metric_key_prefix="train"
+                metric_key_prefix='train'
             )
 
             return control_copy
@@ -81,9 +100,16 @@ class CustomCallback(TrainerCallback):
         args: TrainingArguments,
         state: TrainerState,
         control: TrainerControl,
-        **kwargs
+        **kwargs: dict[str, Any]
     ) -> None:
-        # TODO - Docstring
+        """Triggers 'On Train End' evaluation.
+
+        Args:
+            args (TrainingArguments): Model Training Arguments.
+            state (TrainerState): Current Model Trainer State.
+            control (TrainerControl): Current Model Trainer Controller.
+            **kwargs (dict[str, Any]): Additional Keyword Arguments.
+        """
 
         self._trainer.evaluate(
             eval_dataset=self._data['test'],
@@ -95,26 +121,66 @@ class CustomCallback(TrainerCallback):
 
 class SlovakBertNerModel:
 
-    # TODO - Docstring
+    """Represents the custom SlovakBERT NER Model."""
 
-    def __init__(self) -> None:
-        # TODO - Docstring
+    def __init__(self, version: str) -> None:
+        """Initializes the SlovakBertNerModel Class.
+
+        Args:
+            version (str): Current Model Version.
+        """
+
+        self._model_name = f'SlovakBERT_NER_Model_V{version}'
+       
+        #######################################################################
+        #                            Path Variables                           #
+        #######################################################################
 
         self._timestamp = datetime.now().strftime('%d_%m_%Y__%H_%M_%S')
 
-        self._seed = 42
+        self._model_output_folder = os.path.join(
+            MODEL_OUTPUT_FOLDER,
+            next(
+                (
+                    s for s in os.listdir(MODEL_OUTPUT_FOLDER)
+                    if f'{version}_' in s
+                ),
+                None
+            )
+        )
 
-        self._test_dataset_file_name = 'SlovakBERT_NER_Model_Test_Dataset'
+        self._model_config = os.path.join(
+            self._model_output_folder,
+            'config.json'
+        )
+
+        self._model_trainer_state_path = os.path.join(
+            self._model_output_folder,
+            'trainer_state.json'
+        )
+
+        self._training_history_output_path = os.path.join(
+            TRAINING_HISTORIES_OUTPUT_FOLDER,
+            self._model_name
+        )
+
+        self._test_dataset_file_name = 'Test_Dataset'
+
+        self._test_dataset_length = 0
 
         self._test_dataset_output_path = os.path.join(
-            MODEL_TEST_DATASET_FOLDER, 
+            MODEL_TEST_DATASET_FOLDER,
             f'{self._test_dataset_file_name}_{self._timestamp}.csv'
         )
-        self._test_dataset_length = 0
+
+        #######################################################################
+        #                            Model Variables                          #
+        #######################################################################
+
+        self._seed = 42
 
         self._tokenizer = RobertaTokenizerFast.from_pretrained(
             pretrained_model_name_or_path='crabz/slovakbert-ner'
-
         )
 
         self._model = AutoModelForTokenClassification.from_pretrained(
@@ -123,42 +189,45 @@ class SlovakBertNerModel:
         )
 
         self._training_args = TrainingArguments(
-            output_dir=SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER,
-            evaluation_strategy='steps',
-            learning_rate=5e-5,
+            output_dir=self._model_output_folder,
+            evaluation_strategy=IntervalStrategy.STEPS,
             per_device_train_batch_size=8,
             per_device_eval_batch_size=8,
-            lr_scheduler_type='linear',
-            num_train_epochs=15,
-            # num_train_epochs=1,   # Only for testing purposes
-            seed=self._seed,
-            save_total_limit=2,
+            learning_rate=5e-5,
             adam_beta1=0.9,
             adam_beta2=0.999,
             adam_epsilon=1e-08,
+            num_train_epochs=15,
+            lr_scheduler_type='linear',
+            save_total_limit=2,
+            seed=self._seed,
         )
-
-        self._data = self._load_data()
 
         self._data_collator = DataCollatorForTokenClassification(
             tokenizer=self._tokenizer
         )
 
+        self._data = self._load_data()
+
         self._trainer = Trainer(
             model=self._model,
             args=self._training_args,
-            train_dataset=self._data['train'],
-            eval_dataset=self._data['validation'],
             data_collator=self._data_collator,
+            train_dataset=self._data['train'],
+            eval_dataset=self._data['validation'],            
             tokenizer=self._tokenizer,
             compute_metrics=self._compute_metrics,
         )
 
         self._trainer.add_callback(
-            CustomCallback(trainer=self._trainer, data=self._data)
+            SlovakBertNerModelCallback(trainer=self._trainer, data=self._data)
         )
 
         self._metric = evaluate.load(path='seqeval')
+
+        #######################################################################
+        #                                Utils                                #
+        #######################################################################
 
         self._plotter = Plotter()
 
@@ -175,9 +244,9 @@ class SlovakBertNerModel:
         ]
 
         self._test_dataset_length = len(test_data_pd)
-        
+
         test_data_pd[['tokens', 'ner_tags']].to_csv(
-            path_or_buf=self._test_dataset_output_path, 
+            path_or_buf=self._test_dataset_output_path,
             index=False,
             quoting=csv.QUOTE_NONNUMERIC
         )
@@ -188,7 +257,7 @@ class SlovakBertNerModel:
 
         for token in tokens:
             if any(re.findall(r'\d+', token)):
-                    return False
+                return False
         return True
 
     def _load_data(self, concat_with_wikiann=True) -> DatasetDict:
@@ -209,6 +278,7 @@ class SlovakBertNerModel:
         data = pd.read_csv(
             os.path.join(
                 ANNOTATED_DATA_FOLDER,
+                'Crabz_-_SlovakBERT_NER_Model',
                 'NBS_sentence_450_Annotated_18_03_2023__14_44_55.csv'
             ),
             usecols=modeling_columns
@@ -347,17 +417,14 @@ class SlovakBertNerModel:
     def _save_model(self):
         # TODO - Docstring
 
-        self._model.save_pretrained(SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER)
-        # self._tokenizer.save_pretrained(
-        #     SLOVAKBERT_NER_MODEL_TOKENIZER_OUTPUT_FOLDER
-        # )
+        self._model.save_pretrained(self._model_output_folder)
 
-        config = json.load(open(SLOVAKBERT_NER_MODEL_CONFIG))
+        config = json.load(open(self._model_config))
 
         config['id2label'] = NER_LABELS
         config['label2id'] = INVERTED_NER_LABELS
 
-        json.dump(config, open(SLOVAKBERT_NER_MODEL_CONFIG, 'w'))
+        json.dump(config, open(self._model_config, 'w'))
 
         self._trainer.save_state()
 
@@ -365,13 +432,14 @@ class SlovakBertNerModel:
         # TODO - Docstring
 
         training_history = process_training_history(
-            training_history_path=SLOVAKBERT_NER_MODEL_TRAINER_STATE
+            training_history_path=self._model_trainer_state_path
         )
 
         self._plotter.display_training_history(
+            model_name=' '.join(self._model_name.split('_')),
             history=training_history,
             index_col='epoch',
-            path=TRAINING_HISTORIES_OUTPUT_FOLDER,
+            path=self._training_history_output_path,
             timestamp=self._timestamp
         )
 
@@ -381,11 +449,11 @@ class SlovakBertNerModel:
         # TODO - Docstring
 
         self._trainer.train()
+        # self._save_model()
 
     def evaluate(self) -> None:
         # TODO - Docstring
 
-        self._save_model()
         self._plot_model_metrics()
 
         annotator = Annotator(
@@ -393,19 +461,19 @@ class SlovakBertNerModel:
             input_data_filename=self._test_dataset_file_name,
             dataset_size=self._test_dataset_length,
             model_test_dataset_evaluation=True,
-            timestamp=self._timestamp, 
+            timestamp=self._timestamp,
             model=AutoModelForTokenClassification.from_pretrained(
-                SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER
+                self._model_output_folder
             ).to('cpu'),
+            model_name=self._model_name,
             tokenizer=self._tokenizer
         )
 
         annotator()
 
-
     def predict(self) -> None:
         model_fine_tuned = AutoModelForTokenClassification.from_pretrained(
-            SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER
+            self._model_output_folder
         )
 
         nlp = pipeline(
@@ -416,9 +484,15 @@ class SlovakBertNerModel:
 
         example = 'Začiatkom roka 2021 sa objavili nezhody medzi Richardom Sulíkom a šéfom hnutia OĽANO Igorom Matovičom, ktoré v istej miere pretrvávajú aj dodnes.'
 
-        pprint(nlp(example))
+        classifications = nlp(example)
+
+        for classification in classifications:
+            pprint(classification)
+
+            print(classification['word'])
+            print(self._tokenizer.decode(self._tokenizer.encode([classification['word']], is_pretokenized=True)))
 
     def __call__(self) -> None:
-        self.train()
+        # self.train()
         self.evaluate()
         # self.predict()
