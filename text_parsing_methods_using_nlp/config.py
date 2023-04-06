@@ -25,6 +25,11 @@ MODEL_TEST_DATASET_FOLDER = os.path.join(
 
 ANNOTATED_DATA_FOLDER = os.path.join(ROOT_DATA_FOLDER, 'annotated')
 
+ANNOTATED_DATA_FOLDER_SLOVAKBERT_NER_VERSION = os.path.join(
+    ANNOTATED_DATA_FOLDER, 
+    'SlovakBERT_NER_Model'
+)
+
 DATA_CONFIG = {
     'NBS_sentence': {
         'raw_input_data_path': os.path.join(
@@ -181,21 +186,16 @@ CLASSIFICATION_REPORTS_OUTPUT_FOLDER = os.path.join(
     'classification_reports'
 )
 
-MODEL_OUTPUT_FOLDER = os.path.join(ROOT_OUTPUT_FOLDER, 'models')
-
-SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER = os.path.join(
-    MODEL_OUTPUT_FOLDER,
-    'slovakbert_ner_model'
+CLASSIFICATION_REPORTS_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION = os.path.join(
+    CLASSIFICATION_REPORTS_OUTPUT_FOLDER,
+    'SlovakBERT_NER_Model'
 )
 
-SLOVAKBERT_NER_MODEL_CONFIG = os.path.join(
-    SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER,
-    'config.json'
-)
-
-SLOVAKBERT_NER_MODEL_TRAINER_STATE = os.path.join(
-    SLOVAKBERT_NER_MODEL_OUTPUT_FOLDER,
-    'trainer_state.json'
+MODEL_OUTPUT_FOLDER = os.path.join(
+    ROOT_OUTPUT_FOLDER,
+    'models',
+    'SlovakBERT_NER_Model',
+    'versions'
 )
 
 PLOT_OUTPUT_FOLDER = os.path.join(ROOT_OUTPUT_FOLDER, 'plots')
@@ -205,14 +205,15 @@ CONFUSION_MATRICES_OUTPUT_FOLDER = os.path.join(
     'confusion_matrices'
 )
 
+CONFUSION_MATRICES_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION = os.path.join(
+    CONFUSION_MATRICES_OUTPUT_FOLDER,
+    'SlovakBERT_NER_Model'
+)
+
 TRAINING_HISTORIES_OUTPUT_FOLDER = os.path.join(
     PLOT_OUTPUT_FOLDER,
-    'training_history'
+    'training_history',
+    'SlovakBERT_NER_Model'
 )
 
 TOKENIZERS_OUTPUT_FOLDER = os.path.join(ROOT_OUTPUT_FOLDER, 'tokenizers')
-
-SLOVAKBERT_NER_MODEL_TOKENIZER_OUTPUT_FOLDER =  os.path.join(
-    TOKENIZERS_OUTPUT_FOLDER,
-    'slovakbert_ner_model_tokenizer'
-)
