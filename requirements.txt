@@ -12,6 +12,7 @@ contourpy==1.0.7
 cycler==0.11.0
 datasets==2.5.2
 dill==0.3.5.1
+evaluate==0.4.0
 filelock==3.8.0
 flatbuffers==23.1.21
 fonttools==4.38.0
@@ -61,6 +62,7 @@ rsa==4.9
 scikit-learn==1.2.1
 scipy==1.10.1
 seaborn==0.12.2
+seqeval==1.2.2
 six==1.16.0
 tensorboard==2.11.2
 tensorboard-data-server==0.6.1
