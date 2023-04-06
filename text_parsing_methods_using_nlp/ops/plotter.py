@@ -14,6 +14,7 @@ class Plotter:
         conf_matrix: np.ndarray,
         title: str,
         labels: List[Any],
+        percentages: bool,
         path: str
     ) -> None:
         """Displays the passed Confusion Matrix.
@@ -22,10 +23,12 @@ class Plotter:
             confusion_matrix (numpy.ndarray): Confusion Matrix to display.
             title (str): Plot title.
             labels (List[Any]): Labels for Columns and Indexes.
+            percentages (bool): Change color based on category percentage.
             path (str): Output save path.
         """
         # SOURCE:
         # https://stackoverflow.com/questions/35572000/how-can-i-plot-a-confusion-matrix
+        # https://stackoverflow.com/a/73154009/14319439
 
         # Convert Confusion Matrix to DataFrame
         conf_matrix = pd.DataFrame(
@@ -34,6 +37,27 @@ class Plotter:
             columns=labels
         )
 
+        if percentages:
+
+            # Calculate total elements in categories
+            conf_matrix['TOTAL'] = conf_matrix.sum(axis=1)
+            conf_matrix.loc['TOTAL'] = conf_matrix.sum()
+
+            # Calculate percentages
+            df_percentages = conf_matrix.div(conf_matrix.TOTAL, axis=0)
+
+            # Remove helping columns
+            conf_matrix = (
+                conf_matrix.drop('TOTAL', axis=1).drop(
+                    conf_matrix.tail(1).index
+                )
+            )
+            df_percentages = (
+                df_percentages.drop('TOTAL', axis=1).drop(
+                    df_percentages.tail(1).index
+                )
+            )
+
         # Create new Figure
         figure = plt.figure(figsize=(16, 9))
 
@@ -41,7 +65,18 @@ class Plotter:
         ax = figure.add_subplot(1, 1, 1)
 
         # Plot the Confusion Matrix
-        sns.heatmap(conf_matrix, annot=True, fmt='g', ax=ax)
+        sns.heatmap(
+            data=df_percentages,
+            annot=conf_matrix,
+            fmt='d',
+            ax=ax,
+            cbar_kws={'label': 'Percentages'}
+        ) if percentages else sns.heatmap(
+            data=conf_matrix,
+            annot=True,
+            fmt='g',
+            ax=ax
+        )
 
         ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right")
 
@@ -73,12 +108,12 @@ class Plotter:
         plt.ylabel('Value')
 
         plt.draw()
-        plt.draw()
         plt.savefig(path)
 
     def display_training_history(
-        self, 
-        history: pd.DataFrame, 
+        self,
+        model_name: str,
+        history: pd.DataFrame,
         index_col: str,
         path: str,
         timestamp: str
@@ -86,6 +121,7 @@ class Plotter:
         """Displays Training History Plots.
 
         Args:
+            model_name (str): Name of NER Model.
             history (pandas.DataFrame) : Training History Data.
             index_col (str) : Training History Data index column name.
             path (str): Training History plot output folder path.
@@ -103,11 +139,11 @@ class Plotter:
             metric = column_pair[0].split('_')[-1]
 
             self.__draw_data_plot(
-                data=history.set_index(index_col), 
+                data=history.set_index(index_col),
                 columns=column_pair,
-                title=f'Training History - {metric.capitalize()}',
+                title=f'{model_name} Training History - {metric.capitalize()}',
                 path=os.path.join(
-                    path, 
+                    path,
                     f'training_history_{metric}_{timestamp}.png'
                 )
             )
