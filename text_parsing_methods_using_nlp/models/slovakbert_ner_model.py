@@ -201,6 +201,9 @@ class SlovakBertNerModel:
             lr_scheduler_type='linear',
             save_total_limit=2,
             seed=self._seed,
+            eval_steps=500,
+            load_best_model_at_end = True,
+            metric_for_best_model='f1'
         )
 
         self._data_collator = DataCollatorForTokenClassification(
@@ -217,6 +220,7 @@ class SlovakBertNerModel:
             eval_dataset=self._data['validation'],            
             tokenizer=self._tokenizer,
             compute_metrics=self._compute_metrics,
+            callbacks = [EarlyStoppingCallback(early_stopping_patience=3)]
         )
 
         self._trainer.add_callback(
@@ -449,7 +453,7 @@ class SlovakBertNerModel:
         # TODO - Docstring
 
         self._trainer.train()
-        # self._save_model()
+        self._save_model()
 
     def evaluate(self) -> None:
         # TODO - Docstring
@@ -493,6 +497,6 @@ class SlovakBertNerModel:
             print(self._tokenizer.decode(self._tokenizer.encode([classification['word']], is_pretokenized=True)))
 
     def __call__(self) -> None:
-        # self.train()
+        self.train()
         self.evaluate()
         # self.predict()
