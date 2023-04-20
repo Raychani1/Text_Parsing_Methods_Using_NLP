@@ -6,7 +6,14 @@ from datetime import datetime
 from typing import Any, List, Tuple
 
 import pandas as pd
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 from transformers import pipeline
 from tqdm import tqdm
 
@@ -29,6 +36,7 @@ from text_parsing_methods_using_nlp.config import (
     YEAR_PREFIX_LEMMAS,
 )
 from text_parsing_methods_using_nlp.ops.plotter import Plotter
+from text_parsing_methods_using_nlp.utils.utils import setup_folders
 
 # Set data config
 config = DATA_CONFIG['NBS_sentence']
@@ -76,9 +84,10 @@ class Annotator:
         """
         self._model_name = model_name
 
-        self._model_version = (
-            None if not self._model_name[-1].isdigit()
-            else self._model_name[-5:]
+        self._model_version_present = self._model_name[-1].isdigit()
+
+        self._parent_model = '.'.join(
+            self._model_name.split('.')[:-1]
         )
 
         self._timestamp = timestamp
@@ -91,7 +100,12 @@ class Annotator:
 
         self._data = pd.read_csv(
             input_data_filepath, delimiter=',', encoding='utf-8'
-        )[:self._dataset_size]
+        )
+
+        if self._dataset_size is not None:
+            self._data = self._data[:self._dataset_size]
+        else:
+            self._dataset_size = len(self._data)
 
         self._output_file_prefix = (
             input_data_filename if self._model_test_dataset_evaluation else
@@ -117,24 +131,62 @@ class Annotator:
             )
         )
 
-        self._classification_report_output_path = os.path.join(
+        self._classification_report_output_folder_path = os.path.join(
             (
-                CLASSIFICATION_REPORTS_OUTPUT_FOLDER if
-                self._model_version is None else
-                CLASSIFICATION_REPORTS_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION
+                os.path.join(
+                    CLASSIFICATION_REPORTS_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION,
+                    self._parent_model
+                ) if self._model_version_present else
+                CLASSIFICATION_REPORTS_OUTPUT_FOLDER
             ),
             self._model_name,
+        )
+
+        self._classification_report_output_path = os.path.join(
+            self._classification_report_output_folder_path,
             f'{self._output_file_prefix}_class_report_{self._timestamp}.txt'
         )
 
-        self._output_path = os.path.join(
+        self._confusion_matrix_output_folder_path = os.path.join(
             (
-                ANNOTATED_DATA_FOLDER if self._model_version is None
-                else ANNOTATED_DATA_FOLDER_SLOVAKBERT_NER_VERSION
+                os.path.join(
+                    CONFUSION_MATRICES_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION,
+                    self._parent_model
+                ) if self._model_version_present else
+                CONFUSION_MATRICES_OUTPUT_FOLDER
             ),
             self._model_name,
+        )
+
+        self._confusion_matrix_output_path = os.path.join(
+            self._confusion_matrix_output_folder_path,
+            f'{self._model_name}_{self._dataset_size}_conf_matrix_'
+            f'{self._timestamp}.png'
+        )
+
+        self._output_folder_path = os.path.join(
+            (
+                os.path.join(
+                    ANNOTATED_DATA_FOLDER_SLOVAKBERT_NER_VERSION,
+                    self._parent_model
+                ) if self._model_version_present
+                else ANNOTATED_DATA_FOLDER
+            ),
+            self._model_name,
+        )
+
+        self._output_path = os.path.join(
+            self._output_folder_path,
             f'{self._model_name}_{self._output_file_prefix}_Annotated_'
             f'{self._timestamp}.csv'
+        )
+
+        setup_folders(
+            folders=[
+                self._classification_report_output_folder_path,
+                self._confusion_matrix_output_folder_path,
+                self._output_folder_path
+            ]
         )
 
         self._ner_pipeline = pipeline(
@@ -392,9 +444,6 @@ class Annotator:
         fixed_ner_tags_col = []
 
         for i in tqdm(range(self._dataset_size)):
-
-            # print(f'Annotation Progress: {i} / {self._dataset_size}')
-
             classifications = self._ner_pipeline(
                 ' '.join(
                     re.sub(
@@ -457,6 +506,17 @@ class Annotator:
             if not self._model_test_dataset_evaluation:
                 fixed_ner_tags_col.append(fixed_ner_tags)
 
+            if len(ner_tags) != len(
+                [
+                    int(j) for j in re.sub(
+                        r'\s+',
+                        ' ',
+                        self._data['ner_tags'][i][1:-1]
+                    ).strip().split(' ')
+                ]
+            ):
+                print(self._data['tokens'][i])
+
         self._data['model_ner_tags'] = ner_tags_col
 
         if not self._model_test_dataset_evaluation:
@@ -515,6 +575,20 @@ class Annotator:
         with open(self._classification_report_output_path, 'w+') as output:
             output.write(classification_report(y_true, y_pred))
 
+        # Display Metrics
+        for average in ['weighted', 'macro']:
+            for metric in [
+                f'{self._model_name} Precision ({average.capitalize()}): '
+                f'{precision_score(y_true, y_pred, average=average)}\n',
+                f'{self._model_name} Recall ({average.capitalize()}): '
+                f'{recall_score(y_true, y_pred, average=average)}\n',
+                f'{self._model_name} F1-Score ({average.capitalize()}): '
+                f'{f1_score(y_true, y_pred, average=average)}\n',
+                f'{self._model_name} Accuracy: '
+                f'{accuracy_score(y_true, y_pred)}\n',
+            ]:
+                print(metric)
+
         # Generate Confusion Matrix
         self._plotter.display_confusion_matrix(
             conf_matrix=confusion_matrix(y_true, y_pred),
@@ -524,16 +598,7 @@ class Annotator:
             ),
             labels=INVERTED_NER_LABELS.keys(),
             percentages=True,
-            path=os.path.join(
-                (
-                    CONFUSION_MATRICES_OUTPUT_FOLDER if
-                    self._model_version is None else
-                    CONFUSION_MATRICES_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION
-                ),
-                self._model_name,
-                f'{self._model_name}_{self._dataset_size}_conf_matrix_'
-                f'{self._timestamp}.png'
-            )
+            path=self._confusion_matrix_output_path
         )
 
     def __call__(self) -> None:
