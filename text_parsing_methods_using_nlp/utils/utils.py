@@ -1,7 +1,25 @@
+import os
 import json
 from typing import Dict, List, Union
 
 import pandas as pd
+
+from text_parsing_methods_using_nlp.wandb_config import WAND_ENV_VARIABLES
+
+
+def setup_weights_and_biases_env_variables() -> None:
+    # TODO - Docstring
+
+    for variable, value in WAND_ENV_VARIABLES.items():
+        if variable not in os.environ or os.getenv(variable) != value:
+            os.environ[variable] = value
+
+def setup_folders(folders: List[str]) -> None:
+    # TODO - Docstring
+
+    for folder in folders:
+        if not os.path.isdir(folder):
+            os.makedirs(folder)
 
 def extract_train_and_eval_evaluations(
     training_history_path: str
