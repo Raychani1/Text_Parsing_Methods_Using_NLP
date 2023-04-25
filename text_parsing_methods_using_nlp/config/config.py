@@ -175,7 +175,21 @@ NER_LABELS_LIST = [
 
 NER_LABELS = {key: value for key, value in enumerate(NER_LABELS_LIST)}
 
+NER_LABELS_STR_KEY = {
+    str(key): value for key, value in enumerate(NER_LABELS_LIST)
+}
+
 INVERTED_NER_LABELS = {label: key for key, label in NER_LABELS.items()}
+
+NER_ENTITY_COLORS = {
+    'PERSON': 'lightblue',
+    'ORGANIZATION': 'lightcoral',
+    'LOCATION': '#FFB703',
+    'DATE': '#EF233C',
+    'TIME': '#CCFF33',
+    'MONEY': 'lightgreen',
+    'PERCENTAGE': '#8D99AE'
+}
 
 # endregion
 
@@ -190,6 +204,7 @@ DEFAULT_MODELLING_PARAMETERS = {
     'attention_probs_dropout_prob': 0.1,
     'classifier_dropout_value': None,
     'filter_numeric_wikiann_rows': True,
+    'concat_with_wikiann': True,
     'early_stopping_patience': None,
     'hyperparameter_tuning':  False,
     'overwrite_output_dir': False,
@@ -322,11 +337,23 @@ ROOT_OUTPUT_FOLDER = os.path.join(os.getcwd(), 'output')
 
 CLASSIFICATION_REPORTS_OUTPUT_FOLDER = os.path.join(
     ROOT_OUTPUT_FOLDER,
+    'metrics',
     'classification_reports'
 )
 
 CLASSIFICATION_REPORTS_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION = os.path.join(
     CLASSIFICATION_REPORTS_OUTPUT_FOLDER,
+    'SlovakBERT_NER_Model'
+)
+
+METRICS_EVALUATION_OUTPUT_FOLDER = os.path.join(
+    ROOT_OUTPUT_FOLDER,
+    'metrics',
+    'test_metric_evaluations'
+)
+
+METRICS_EVALUATION_OUTPUT_FOLDER_SLOVAKBERT_NER_VERSION = os.path.join(
+    METRICS_EVALUATION_OUTPUT_FOLDER,
     'SlovakBERT_NER_Model'
 )
 

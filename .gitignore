@@ -106,3 +106,7 @@ GitHub.sublime-settings
 .history
 
 .fuse*
+backup/
+wandb/
+tmp/
+text_parsing_methods_using_nlp/config/wandb_config.py
