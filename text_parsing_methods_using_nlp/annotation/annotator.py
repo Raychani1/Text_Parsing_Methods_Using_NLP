@@ -505,8 +505,6 @@ class Annotator:
             ner_tags.extend(current_ner_tag)
 
             if not self._model_test_dataset_evaluation:
-                # TODO - Extract functionality to reduce complexity
-
                 # Correct model prediction if needed
                 current_ner_tag = self._fix_ner_tags(
                     ner_tags=current_ner_tag,
