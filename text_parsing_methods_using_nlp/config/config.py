@@ -1,12 +1,8 @@
 import os
 
-from transformers import IntervalStrategy
-
 # region Data
 
 ROOT_DATA_FOLDER = os.path.join(os.getcwd(), 'data')
-
-RAW_DATA_FOLDER = os.path.join(ROOT_DATA_FOLDER, 'raw')
 
 MANUAL_CORRECTION_DATA_FOLDER = os.path.join(
     ROOT_DATA_FOLDER,
@@ -36,10 +32,16 @@ ANNOTATED_NBS_SENTENCES_DATASET = os.path.join(
     'NBS_sentence_450_Annotated_18_03_2023__14_44_55.csv'
 )
 
+DATASET_DISTRIBUTION_OUTPUT_FOLDER = os.path.join(
+    ROOT_DATA_FOLDER,
+    'distribution'
+)
+
 DATA_CONFIG = {
     'NBS_sentence': {
         'raw_input_data_path': os.path.join(
-            RAW_DATA_FOLDER,
+            ROOT_DATA_FOLDER,
+            'raw',
             'NBS_sentence.csv'
         ),
         'dataset_size': 8445,
@@ -207,6 +209,7 @@ DEFAULT_MODELLING_PARAMETERS = {
     'concat_with_wikiann': True,
     'early_stopping_patience': None,
     'hyperparameter_tuning':  False,
+    'layers_to_freeze': None,
     'overwrite_output_dir': False,
     'do_train': False,
     'do_eval': False,
@@ -313,21 +316,49 @@ DEFAULT_MODELLING_PARAMETERS = {
     'torch_compile_mode': None
 }
 
-# {
-#     'hidden_dropout_prob': 0.1,
-#     'attention_probs_dropout_prob': 0.1,
-#     'classifier_dropout': None,
-#     'seed': 42,
+# endregion
 
-#     'strategy': IntervalStrategy.EPOCH,
-#     'per_device_train_batch_size':  8,
-#     'per_device_eval_batch_size':  8,
-#     'learning_rate':  5e-05,
-#     'weight_decay':  0,
-#     'num_train_epochs':  15,
+# region Visualization
 
-# }
+EVALUATION_COLUMNS = {
+    'eval': [
+        'eval/precision',
+        'eval/recall',
+        'eval/f1',
+        'eval/accuracy',
+    ],
+    'test': [
+        'test/precision',
+        'test/recall',
+        'test/f1',
+        'test/accuracy',
+    ],
+    'macro': [
+        'test/macro_precision',
+        'test/macro_recall',
+        'test/macro_f1',
+    ]
+}
 
+MODEL_GENERATION_COLUMNS = [
+    'Name',
+    'attention_probs_dropout_prob',
+    'hidden_dropout_prob',
+    'classifier_dropout',
+    'per_device_train_batch_size',
+    'per_device_eval_batch_size',
+    'learning_rate',
+    'weight_decay',
+    'num_train_epochs',
+    'warmup_steps',
+    'seed',
+    'early_stopping_patience',
+    'train/epoch',
+    'parent_version',
+    *EVALUATION_COLUMNS['eval'],
+    *EVALUATION_COLUMNS['test'],
+    *EVALUATION_COLUMNS['macro'],
+]
 
 # endregion
 
@@ -381,7 +412,5 @@ TRAINING_HISTORIES_OUTPUT_FOLDER = os.path.join(
     'training_history',
     'SlovakBERT_NER_Model'
 )
-
-TOKENIZERS_OUTPUT_FOLDER = os.path.join(ROOT_OUTPUT_FOLDER, 'tokenizers')
 
 # endregion
