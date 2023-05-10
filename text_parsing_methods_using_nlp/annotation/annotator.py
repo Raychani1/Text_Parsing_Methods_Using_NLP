@@ -504,7 +504,10 @@ class Annotator:
             # Save model prediction
             ner_tags.extend(current_ner_tag)
 
-            if not self._model_test_dataset_evaluation:
+            if (
+                not self._model_test_dataset_evaluation and
+                self._model_name == 'Crabz_-_SlovakBERT_NER_Model'
+            ):
                 # Correct model prediction if needed
                 current_ner_tag = self._fix_ner_tags(
                     ner_tags=current_ner_tag,
@@ -512,15 +515,15 @@ class Annotator:
                     word_index=word_index
                 )
 
-                # Save corrected values
-                fixed_ner_tags.extend(current_ner_tag)
+            # Save corrected values
+            fixed_ner_tags.extend(current_ner_tag)
 
-                if not self._manual_correction_file_exists:
-                    self._document_annotation_process(
-                        row_index=row_index,
-                        word_index=word_index,
-                        current_ner_tag=current_ner_tag
-                    )
+            if not self._manual_correction_file_exists:
+                self._document_annotation_process(
+                    row_index=row_index,
+                    word_index=word_index,
+                    current_ner_tag=current_ner_tag
+                )
 
             word_index += 1
 
@@ -713,7 +716,7 @@ class Annotator:
             `row_index` (int): Current processed row index.
 
             `word_index` (int): Current processed word index.
-            
+
             `current_ner_tag` (List[int]): Current word NER Tag.
         """
         ner_tag = (
