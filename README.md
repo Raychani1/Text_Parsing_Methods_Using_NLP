@@ -4,6 +4,7 @@
 
 The main goal of this project is the development of a Deep Learning model for Named Entity Recognition (NER) in Slovak. The [**Gerulata/SlovakBERT**](https://huggingface.co/gerulata/slovakbert) based model is fine-tuned on webscraped Slovak news articles. The finished model supports the following IOB tagged entity categories: *Person*, *Organisation*, *Location*, *Date*, *Time*, *Money* and *Percentage*. 
 
+</br>
 
 ### **Related Work**
 [![Thesis][Thesis]][Thesis-url]
@@ -12,6 +13,7 @@ The main goal of this project is the development of a Deep Learning model for Na
 
 [![HuggingFaceModel][HuggingFaceModel]][HuggingFaceModel-url]
 
+</br>
 
 ### **Built With**
 [![Python 3.10][Python]][Python-url]
@@ -26,6 +28,7 @@ The main goal of this project is the development of a Deep Learning model for Na
 [![Scikit][Scikit]][Scikit-url]
 [![PyTorch][Pytorch]][Pytorch-url]
 
+</br>
 
 ### **Best Model Training Parameters**
 
@@ -41,6 +44,8 @@ The main goal of this project is the development of a Deep Learning model for Na
 |      lr_scheduler_type      |   linear  |
 |             seed            |     42    |
 
+</br>
+
 ### **Best Model Training History**
 Best model results are reached in the 8th training epoch.
 
@@ -54,6 +59,8 @@ Best model results are reached in the 8th training epoch.
 | 0.0233        | 6.0   | 420  | 0.1255          | 0.8576    | 0.8878 | 0.8724 | 0.9716   |
 | 0.0198        | 7.0   | 490  | 0.1383          | 0.8545    | 0.8846 | 0.8693 | 0.9703   |
 | 0.0133        | 8.0   | 560  | 0.1241          | 0.884     | 0.9038 | 0.8938 | 0.9735   |
+
+</br>
 
 ### **Best Model Results**
 
@@ -75,24 +82,35 @@ Dataset distribution for final evaluation:
 |  **B-Percentage** |          57          |
 |  **I-Percentage** |          54          |
 
+</br>
+
 Confusion Matrix of the final evaluation:
 ![image](https://github.com/Raychani1/Text_Parsing_Methods_Using_NLP/assets/45550552/e6d1a1c6-e02f-4de9-9684-5882a405d31f)
+
+</br>
 
 Evaluation metrics of the final evaluation:
 | **Precision** | **Macro-Precision** | **Recall** | **Macro-Recall** | **F1** | **Macro-F1** | **Accuracy** |
 |:-------------:|:-------------------:|:----------:|:----------------:|:------:|:------------:|:------------:|
 |     0.9897    |        0.9715       |   0.9897   |      0.9433      | 0.9895 |    0.9547    |    0.9897    |
 
+</br>
+
 ### **Model Prediction Output Example**
 
 ![prediction_output](https://github.com/Raychani1/Text_Parsing_Methods_Using_NLP/assets/45550552/723ab7f1-4efb-4d03-87d6-b9ac1e40990f)
 
+</br>
 
 ## **Getting Started**
 To get a local copy up and running follow these simple steps.
 
+</br>
+
 ### **Prerequisites**
 * **Python 3.10.x** - It is either installed on your Linux distribution or on other Operating Systems you can get it from the [Official Website](https://www.python.org/downloads/release/python-3100/), [Microsoft Store](https://apps.microsoft.com/store/detail/python-310/9PJPW5LDXLZ5?hl=en-us&gl=US) or through `Windows Subsystem for Linux (WSL)` using this [article](https://medium.com/@rhdzmota/python-development-on-the-windows-subsystem-for-linux-wsl-17a0fa1839d).
+
+</br>
 
 ## **Setup and Usage**
 
@@ -139,9 +157,13 @@ To get a local copy up and running follow these simple steps.
     python main.py
     ```
 
+</br>
+
 ## **License**
 
 Distributed under the **MIT License**. See [LICENSE](https://github.com/Raychani1/Text_Parsing_Methods_Using_NLP/blob/main/LICENSE) for more information.
+
+</br>
 
 ## **Acknowledgments**
 [Gerulata / SlovakBERT (Hugging Face Model)](https://huggingface.co/gerulata/slovakbert)
@@ -149,10 +171,6 @@ Distributed under the **MIT License**. See [LICENSE](https://github.com/Raychani
 [Crabz / SlovakBERT-NER (Hugging Face Model)](https://huggingface.co/crabz/slovakbert-ner)
 
 [Rohan Paul / YT_Fine_tuning_BERT_NER_v1 (Tutorial)](https://github.com/rohan-paul/MachineLearning-DeepLearning-Code-for-my-YouTube-Channel/blob/master/NLP/YT_Fine_tuning_BERT_NER_v1.ipynb)
-
-
-
-
 
 <!-- Variables -->
 
