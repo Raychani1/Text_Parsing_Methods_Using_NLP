@@ -391,13 +391,13 @@ class SlovakBertNerModel:
             use for data loading (PyTorch only). Defaults to 0. 0 means that 
             the data will be loaded in the main process.
 
-            `past_index` (int, optional): Some models like [TransformerXL]
-            (../model_doc/transformerxl) or [XLNet](../model_doc/xlnet) can 
-            make use of the past hidden states for their predictions. If this 
-            argument is set to a positive int, the `Trainer` will use the 
-            corresponding output (usually index 2) as the past state and feed 
-            it to the model at the next training step under the keyword 
-            argument `mems`. Defaults to -1.
+            `past_index` (int, optional): Some models like 
+            [TransformerXL](https://github.com/huggingface/transformers/tree/main/src/transformers/models/transfo_xl) or 
+            [XLNet](https://github.com/huggingface/transformers/tree/main/src/transformers/models/xlnet) can make use of the past hidden states
+            for their predictions. If this argument is set to a positive int, 
+            the `Trainer` will use the corresponding output (usually index 2) 
+            as the past state and feed it to the model at the next training 
+            step under the keyword argument `mems`. Defaults to -1.
 
             `run_name` (str, optional): A descriptor for the run. Typically 
             used for [wandb](https://www.wandb.com/) and [mlflow](https://www.mlflow.org/)
@@ -460,9 +460,10 @@ class SlovakBertNerModel:
             results as the interrupted training would have.
 
             `sharded_ddp` (bool, str or list of trainer_utils.ShardedDDPOption, 
-            optional): Use Sharded DDP training from [FairScale]
-            (https://github.com/facebookresearch/fairscale) (in distributed 
-            training only). This is an experimental feature. Defaults to False.
+            optional): Use Sharded DDP training from 
+            [FairScale](https://github.com/facebookresearch/fairscale) (in 
+            distributed training only). This is an experimental feature. 
+            Defaults to False.
 
                 A list of options along the following:
 
@@ -633,7 +634,7 @@ class SlovakBertNerModel:
             hyperparameter search with Ray. Defaults to 'last'. Ray will then 
             use the last checkpoint of all trials, compare those, and select 
             the best one. However, other options are also available. See the 
-            [Ray documentation](https://docs.ray.io/en/latest/tune/api_docs/analysis.html#ray.tune.ExperimentAnalysis.get_best_trial) 
+            [Ray documentation](https://docs.ray.io/en/latest/tune/index.html) 
             for more options.
 
             `ddp_timeout` (int, optional): The timeout for 
