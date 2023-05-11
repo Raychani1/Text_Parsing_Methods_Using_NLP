@@ -85,28 +85,7 @@ Evaluation metrics of the final evaluation:
 
 ### **Model Prediction Output Example**
 
-<div class="entities" style="line-height: 2.5; direction: ltr">Hoci podľa ostatných údajov 
-<mark class="entity" style="background: lightcoral; padding: 0.45em 0.6em; margin: 0 0.25em; line-height: 1; border-radius: 0.35em;">
-    NBS
-    <span style="font-size: 0.8em; font-weight: bold; line-height: 1; border-radius: 0.35em; vertical-align: middle; margin-left: 0.5rem">Organization</span>
-</mark>
- pre 
-<mark class="entity" style="background: #FFB703; padding: 0.45em 0.6em; margin: 0 0.25em; line-height: 1; border-radius: 0.35em;">
-    Bratislavský kraj
-    <span style="font-size: 0.8em; font-weight: bold; line-height: 1; border-radius: 0.35em; vertical-align: middle; margin-left: 0.5rem">Location</span>
-</mark>
- je aktuálna priemerná cena nehnuteľností na úrovni 
-<mark class="entity" style="background: lightgreen; padding: 0.45em 0.6em; margin: 0 0.25em; line-height: 1; border-radius: 0.35em;">
-    2 072 eur
-    <span style="font-size: 0.8em; font-weight: bold; line-height: 1; border-radius: 0.35em; vertical-align: middle; margin-left: 0.5rem">Money</span>
-</mark>
- za štvorcový meter, ceny bytov v 
-<mark class="entity" style="background: #FFB703; padding: 0.45em 0.6em; margin: 0 0.25em; line-height: 1; border-radius: 0.35em;">
-    hlavnom meste
-    <span style="font-size: 0.8em; font-weight: bold; line-height: 1; border-radius: 0.35em; vertical-align: middle; margin-left: 0.5rem">Location</span>
-</mark>
- sú podstatne vyššie.</div>
-
+![prediction_output](https://github.com/Raychani1/Text_Parsing_Methods_Using_NLP/assets/45550552/723ab7f1-4efb-4d03-87d6-b9ac1e40990f)
 
 
 ## **Getting Started**
