@@ -599,9 +599,9 @@ class Annotator:
         """Evaluates Model Annotation Performance using a Standardized Metrics.
 
         Args:
-            y_true (pd.Series): True values.
+            `y_true` (pd.Series): True values.
 
-            y_pred (pd.Series): Predicted values.
+            `y_pred` (pd.Series): Predicted values.
         """
         pd.DataFrame(
             {
