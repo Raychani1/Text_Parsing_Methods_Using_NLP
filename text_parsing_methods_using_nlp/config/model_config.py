@@ -12,7 +12,6 @@ MODEL_CONFIG_V_POC = {
     'save_strategy': IntervalStrategy.EPOCH,
     'save_total_limit': 2,
     'eval_steps': 500,
-    'report_to': 'wandb',
     'load_best_model_at_end': True,
     'metric_for_best_model': 'f1',
 }
@@ -30,7 +29,6 @@ MODEL_CONFIG_V0_0_1 = {
     'save_strategy': IntervalStrategy.EPOCH,
     'save_total_limit': 2,
     'eval_steps': 500,
-    'report_to': 'wandb',
     'load_best_model_at_end': True,
     'metric_for_best_model': 'f1',
 }
@@ -48,7 +46,6 @@ MODEL_CONFIG_V0_0_2 = {
     'save_strategy': IntervalStrategy.EPOCH,
     'save_total_limit': 2,
     'eval_steps': 500,
-    'report_to': 'wandb',
     'load_best_model_at_end': True,
     'metric_for_best_model': 'f1',
 }
@@ -67,7 +64,6 @@ MODEL_CONFIG_V0_0_3 = {
     'save_strategy': IntervalStrategy.EPOCH,
     'save_total_limit': 2,
     'eval_steps': 500,
-    'report_to': 'wandb',
     'load_best_model_at_end': True,
     'metric_for_best_model': 'f1',
 }
@@ -88,7 +84,6 @@ MODEL_CONFIG_V0_0_4 = {
     'save_strategy': IntervalStrategy.EPOCH,
     'save_total_limit': 2,
     'eval_steps': 500,
-    'report_to': 'wandb',
     'load_best_model_at_end': True,
     'metric_for_best_model': 'f1',
 }
@@ -112,7 +107,6 @@ MODEL_CONFIG_V0_0_5 = {
     'save_strategy': IntervalStrategy.EPOCH,
     'save_total_limit': 2,
     'eval_steps': 500,
-    'report_to': 'wandb',
     'load_best_model_at_end': True,
     'metric_for_best_model': 'f1',
 }
@@ -134,7 +128,6 @@ MODEL_CONFIG_V0_0_6 = {
     'save_strategy': IntervalStrategy.EPOCH,
     'save_total_limit': 2,
     'eval_steps': 500,
-    'report_to': 'wandb',
     'load_best_model_at_end': True,
     'metric_for_best_model': 'f1',
 }
