@@ -175,7 +175,7 @@ Distributed under the **MIT License**. See [LICENSE](https://github.com/Raychani
 <!-- Variables -->
 
 [Thesis]: https://img.shields.io/badge/%F0%9F%93%9C-Masters%20Thesis-blue?style=for-the-badge
-[Thesis-url]: #
+[Thesis-url]: https://opac.crzp.sk/?fn=detailBiblioForm&sid=C0DEB8E07572332BA2230915805F
 
 [Publication]: https://img.shields.io/badge/%F0%9F%93%84-Publication-green?style=for-the-badge
 [Publication-url]: #
