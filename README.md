@@ -9,7 +9,7 @@ The main goal of this project is the development of a Deep Learning model for Na
 ### **Related Work**
 [![Thesis][Thesis]][Thesis-url]
 
-[![Publication][Publication]][Publication-url]
+<!-- [![Publication][Publication]][Publication-url] -->
 
 [![HuggingFaceModel][HuggingFaceModel]][HuggingFaceModel-url]
 
@@ -181,7 +181,7 @@ Distributed under the **MIT License**. See [LICENSE](https://github.com/Raychani
 [Publication-url]: #
 
 [HuggingFaceModel]: https://custom-icon-badges.demolab.com/badge/Hugging%20Face%20Model-orange.svg?logo=huggingface&style=for-the-badge&labelColor=555
-[HuggingFaceModel-url]: #
+[HuggingFaceModel-url]: https://huggingface.co/Raychani1/slovakbert-ner-v2
 
 [Python]: https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54
 [Python-url]: https://www.python.org/
